@@ -1,120 +1,104 @@
 ## WiseGrade (Frontend)
 
-Frontend en React + Vite para consumir el backend Spring Boot.
+Frontend en **React + Vite (TypeScript)** para consumir el backend de WiseGrade (Spring Boot).
 
-### Config
+Su función principal es que un estudiante pueda:
 
-- Crear un `.env.local` (o exportar variables) basado en `.env.example`.
-- Variable principal: `VITE_API_BASE_URL` (por defecto `http://localhost:8080`).
+- Iniciar un intento de examen.
+- Responder preguntas (guardando progreso local).
+- Enviar el intento al backend con tolerancia a fallos de red.
 
-Ejemplo:
+Documentación de snapshot del estado actual: ver `Documents/frontend-summary.md`.
+
+---
+
+## Requisitos
+
+- Node.js + npm
+- Backend corriendo (por defecto en `http://localhost:8080`)
+
+---
+
+## Configuración
+
+Crear un `.env.local` (o exportar variables) basado en `.env.example`:
 
 ```bash
 cp .env.example .env.local
 ```
 
-### Ejecutar en desarrollo
+Variables:
+
+- `VITE_API_BASE_URL` (default: `http://localhost:8080`)
+- `VITE_EXAM_DURATION_MINUTES` (default: `30`, solo countdown UI)
+
+---
+
+## Ejecutar en desarrollo
 
 ```bash
 npm install
 npm run dev
 ```
 
-### Flujo implementado (Fase 3 + antitrampa)
+Otros comandos:
 
-- Iniciar intento: `POST /api/intentos/iniciar`
-- Presentar preguntas y guardar respuestas en LocalStorage
-- Enviar: `POST /api/intentos/enviar` con reintentos automáticos si falla
-- Reanudar tras refresh: usa un snapshot del intento + respuestas guardadas
-
-Antitrampa (mínimo):
-
-- Cambio de pestaña / pérdida de foco / salida de fullscreen
-- 3 advertencias ⇒ bloqueo de responder
-- Al bloquear ⇒ auto-envío del intento
-- Tras enviar (`SUBMITTED`) se muestra aviso de “no se puede presentar nuevamente” y el cronómetro queda congelado
-
-### LocalStorage
-
-Claves usadas:
-
-- `wisegrade:attempt:<intentoId>` (borrador: respuestas, warnings, pending)
-- `wisegrade:lastAttemptId`
-
-Para re-probar desde cero: borra las claves `wisegrade:*`.
+- `npm run build`
+- `npm run preview`
+- `npm run lint`
 
 ---
 
-# React + TypeScript + Vite
+## Flujo local típico (end-to-end)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+1. Levanta MySQL y el backend.
+2. En backend, ejecuta el seed demo (imprime IDs):
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```bash
+cd ../backend
+./scripts/seed-demo-exam.sh
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+3. Inicia el frontend (`npm run dev`).
+4. En la pantalla inicial pega los IDs (periodo/materia/momento/docente/estudiante) e inicia el intento.
 
-```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
+---
 
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs["recommended-typescript"],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
-```
+## Endpoints que consume
+
+- Catálogos:
+  - `GET /api/periodos`
+  - `GET /api/materias`
+  - `GET /api/momentos`
+- Intentos:
+  - `POST /api/intentos/iniciar`
+  - `POST /api/intentos/enviar`
+  - `GET /api/intentos/{intentoId}`
+
+---
+
+## Persistencia local (LocalStorage)
+
+Claves usadas:
+
+- `wisegrade:lastAttemptId`
+- `wisegrade:attempt:<intentoId>` (snapshot del intento + respuestas + flags)
+
+Para re-probar desde cero: borra claves `wisegrade:*` en el navegador.
+
+---
+
+## Antitrampa (mínimo)
+
+- Cambio de pestaña/ventana, pérdida de foco, salida de fullscreen
+- 3 advertencias ⇒ bloqueo de responder
+- Al bloquear ⇒ auto-envío del intento
+- Tras enviar (`SUBMITTED`) el cronómetro se congela y no se permite presentar nuevamente
+
+---
+
+## Troubleshooting
+
+- **CORS error**: revisa `APP_CORS_ALLOWED_ORIGINS` en el backend (default `http://localhost:5173`).
+- **"Examen not found"**: falta cargar banco de preguntas para esa combinación (o falta asociación docente↔materia).
+- **Se queda en "pending submit"**: normalmente es backend caído/red inestable; al volver el backend el frontend reintenta cada ~5s.
