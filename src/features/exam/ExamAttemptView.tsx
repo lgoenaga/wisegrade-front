@@ -67,6 +67,14 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     }
   }, [intento])
 
+  // Reflect backend state if the attempt was already submitted.
+  useEffect(() => {
+    if (intento.estado === 'SUBMITTED') {
+      setSubmitOk(true)
+      setPendingSubmit(false)
+    }
+  }, [intento.estado])
+
   // countdown tick
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000)
