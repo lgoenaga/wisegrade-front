@@ -70,10 +70,15 @@ cd ../backend
   - `GET /api/periodos`
   - `GET /api/materias`
   - `GET /api/momentos`
+  - `GET /api/docentes`
 - Intentos:
   - `POST /api/intentos/iniciar`
   - `POST /api/intentos/enviar`
   - `GET /api/intentos/{intentoId}`
+
+Además, incluye una pantalla de **Resultados** (visible para todos por ahora) para consultar intentos SUBMITTED por configuración:
+
+- `GET /api/examenes/resultados?periodoId=...&materiaId=...&momentoId=...&docenteResponsableId=...`
 
 ---
 
