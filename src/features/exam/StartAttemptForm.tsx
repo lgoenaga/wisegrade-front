@@ -287,8 +287,9 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
           </p>
         ) : null}
 
-        <div className="row">
+        <div className="row startActions">
           <button
+            className="startButton"
             disabled={!canSubmit}
             onClick={() =>
               onStart({

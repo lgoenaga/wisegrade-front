@@ -127,12 +127,22 @@
 
 .formGrid {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .field label {
   display: block;
   font-size: 13px;
   font-weight: 650;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
+}
+
+.startActions {
+  justify-content: center;
+}
+
+.startButton {
+  width: min(100%, 340px);
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
