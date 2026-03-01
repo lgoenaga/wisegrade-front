@@ -64,6 +64,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [antiCheatNote, setAntiCheatNote] = useState<string | null>(null)
+  const [attemptMeta, setAttemptMeta] = useState<{ materiaNombre?: string } | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [hydrated, setHydrated] = useState(false)
   const [submittedDetail, setSubmittedDetail] = useState<IntentoDetalleResponse | null>(null)
@@ -84,7 +85,9 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   useEffect(() => {
     setHydrated(false)
     navInitializedRef.current = false
+    setError(null)
     const draft = loadAttemptDraft(intento.intentoId)
+    setAttemptMeta(draft?.meta ?? null)
     const serverAnswers = answersFromServer('respuestas' in intento ? intento.respuestas : undefined)
     const hasServerAnswers = Object.keys(serverAnswers).length > 0
     const hasServerSnapshot = 'respuestas' in intento
@@ -97,6 +100,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       setBlocked(Boolean(draft?.blocked))
       saveAttemptDraft({
         intentoSnapshot: intento,
+        meta: draft?.meta,
         answersByPreguntaId: serverAnswers,
         pendingSubmit: false,
         antiCheatWarnings: Number.isFinite(draft?.antiCheatWarnings) ? (draft?.antiCheatWarnings as number) : 0,
@@ -124,6 +128,8 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     })
     setHydrated(true)
   }, [intento])
+
+  const materiaNombre = attemptMeta?.materiaNombre ?? null
 
   // Initialize the question page (once per attempt) to the first unanswered question.
   useEffect(() => {
@@ -417,8 +423,10 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-        <h2>Examen (intento #{intento.intentoId})</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>
+          Examen{materiaNombre ? `: ${materiaNombre}` : ''}
+        </h2>
         <div style={{ textAlign: 'right' }}>
           <div>
             Tiempo restante: <strong>{mm}:{ss}</strong>
@@ -431,18 +439,22 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       </div>
 
-      <div style={{ marginTop: 8, opacity: 0.8 }}>
+      <div style={{ marginTop: 2, opacity: 0.8, fontSize: 13 }}>
+        ID Examen: <strong>{intento.examenId}</strong>
+      </div>
+
+      <div style={{ marginTop: 4, opacity: 0.8, fontSize: 13 }}>
         Estado: <strong>{submitOk ? 'ENVIADO' : pendingSubmit ? 'PENDIENTE DE ENVÍO' : 'EN PROGRESO'}</strong>
       </div>
 
       {submitOk ? (
-        <p style={{ marginTop: 12 }}>
+        <p style={{ marginTop: 6, fontSize: 13 }}>
           <strong>Aviso:</strong> Este intento ya fue enviado y no se puede presentar nuevamente.
         </p>
       ) : null}
 
       {isSubmitted ? (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 6, fontSize: 13 }}>
           <strong>Resultado:</strong>{' '}
           {submittedDetail?.resultado ? (
             <span>
@@ -456,14 +468,14 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       ) : null}
 
       {!submitOk ? (
-        <div style={{ marginTop: 8, opacity: 0.8 }}>
+        <div style={{ marginTop: 4, opacity: 0.8, fontSize: 13 }}>
           Antitrampa: <strong>{blocked ? 'BLOQUEADO' : `${antiCheatWarnings}/3`}</strong>
           {antiCheatWarnings > 0 && !blocked ? <span> · Al llegar a 3 se bloquea</span> : null}
         </div>
       ) : null}
 
       {!submitOk ? (
-        <div style={{ marginTop: 8, opacity: 0.8 }}>
+        <div style={{ marginTop: 4, opacity: 0.8, fontSize: 13 }}>
           Respondidas: <strong>{answeredCount}</strong> / {intento.preguntas.length}
           {missingCount > 0 ? (
             <span>
@@ -475,20 +487,21 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       ) : null}
 
       {error ? (
-        <p style={{ marginTop: 12 }}>
+        <p style={{ marginTop: 6, fontSize: 13 }}>
           <strong>Error:</strong> {error}
         </p>
       ) : null}
 
       {antiCheatNote ? (
-        <p style={{ marginTop: 12 }}>
+        <p style={{ marginTop: 6, fontSize: 13 }}>
           <strong>Antitrampa:</strong> {antiCheatNote}
         </p>
       ) : null}
 
       {!submitOk && !blocked ? (
-        <div style={{ marginTop: 12, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
+            className="examBtn"
             onClick={async () => {
               try {
                 await document.documentElement.requestFullscreen()
@@ -503,21 +516,21 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       ) : null}
 
-      <div style={{ marginTop: 16 }} className="stack">
+      <div style={{ marginTop: 10 }} className="stack">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <div style={{ fontSize: 14 }} className="muted">
             Pregunta <strong>{totalPreguntas ? currentIdx + 1 : 0}</strong> / {totalPreguntas}
           </div>
           <div className="row">
             <button
-              className="btnSecondary"
+              className="btnSecondary examBtn"
               disabled={totalPreguntas === 0 || currentIdx <= 0}
               onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
             >
               Anterior
             </button>
             <button
-              className="btnSecondary"
+              className="btnSecondary examBtn"
               disabled={totalPreguntas === 0 || currentIdx >= totalPreguntas - 1}
               onClick={() => setCurrentIdx((i) => Math.min(totalPreguntas - 1, i + 1))}
             >
@@ -576,14 +589,14 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-        <button disabled={!canSubmit} onClick={() => void trySubmit(false)}>
+      <div className="examSubmitRow">
+        <button className="examBtn examSubmitBtn" disabled={!canSubmit} onClick={() => void trySubmit(false)}>
           {submitting ? 'Enviando…' : pendingSubmit ? 'Pendiente…' : 'Enviar'}
         </button>
       </div>
 
       {pendingSubmit && !submitOk ? (
-        <p style={{ marginTop: 8, opacity: 0.8 }}>Reintentando envío automáticamente…</p>
+        <p style={{ marginTop: 6, opacity: 0.8, fontSize: 13 }}>Reintentando envío automáticamente…</p>
       ) : null}
     </div>
   )
