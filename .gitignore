@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local design references (do not version)
+src/assets/Paleta\ Cesde.png
