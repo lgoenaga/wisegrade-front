@@ -28,6 +28,12 @@ function formatLocalDateTime(value: string | null | undefined): string {
   return value.replace('T', ' ')
 }
 
+function calcResultsPageSize(viewportWidth: number, viewportHeight: number): 10 | 15 {
+  // Keep it intentionally simple: prefer 15 only on large screens.
+  if (viewportWidth >= 900 && viewportHeight >= 900) return 15
+  return 10
+}
+
 export function ResultsView() {
   const [periodoId, setPeriodoId] = useState('')
   const [materiaId, setMateriaId] = useState('')
@@ -43,6 +49,17 @@ export function ResultsView() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ExamenResultadosResponse | null>(null)
+
+  const [viewport, setViewport] = useState(() => {
+    if (typeof window === 'undefined') return { w: 1024, h: 768 }
+    return { w: window.innerWidth, h: window.innerHeight }
+  })
+
+  const pageSize = useMemo(() => {
+    return calcResultsPageSize(viewport.w, viewport.h)
+  }, [viewport.h, viewport.w])
+
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     const ac = new AbortController()
@@ -68,6 +85,15 @@ export function ResultsView() {
     }
     void loadCatalogs()
     return () => ac.abort()
+  }, [])
+
+  useEffect(() => {
+    function onResize() {
+      setViewport({ w: window.innerWidth, h: window.innerHeight })
+    }
+
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   const parsed = useMemo(() => {
@@ -117,6 +143,7 @@ export function ResultsView() {
 
       const res = await apiGetJson<ExamenResultadosResponse>(`/api/examenes/resultados?${qs.toString()}`)
       setData(res)
+      setPage(1)
     } catch (e: unknown) {
       setError(extractErrorMessage(e, 'No se pudieron cargar los resultados'))
       setData(null)
@@ -125,8 +152,25 @@ export function ResultsView() {
     }
   }
 
+  const filas = useMemo(() => {
+    return data?.filas ?? []
+  }, [data])
+  const totalPages = useMemo(() => {
+    const n = Math.ceil(filas.length / pageSize)
+    return Math.max(1, n)
+  }, [filas.length, pageSize])
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages))
+  }, [totalPages])
+
+  const pagedFilas = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filas.slice(start, start + pageSize)
+  }, [filas, page, pageSize])
+
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', textAlign: 'left' }}>
+    <div style={{ width: '100%', textAlign: 'left' }}>
       <div className="card stack">
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>Resultados</h2>
@@ -141,7 +185,7 @@ export function ResultsView() {
           </p>
         ) : null}
 
-        <div className="formGrid">
+        <div className="resultsFiltersGrid">
           <div className="field">
             <label>Periodo</label>
             <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)}>
@@ -243,42 +287,84 @@ export function ResultsView() {
                   </div>
                 </div>
                 <div className="muted" style={{ fontSize: 13 }}>
-                  Filas: {data.filas?.length ?? 0}
+                  Filas: {filas.length}
                 </div>
               </div>
             </div>
 
-            <div className="card" style={{ padding: 10, overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            {filas.length > 0 ? (
+              <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+                <div className="muted" style={{ fontSize: 13 }}>
+                  Página {page} de {totalPages} · {pageSize} por página
+                </div>
+                <div className="row" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="card" style={{ padding: 8, overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '42%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '12%' }} />
+                </colgroup>
                 <thead>
                   <tr style={{ textAlign: 'left' }}>
-                    <th style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estudiante</th>
-                    <th style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>Nota</th>
-                    <th style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>Inicio</th>
-                    <th style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>Envío</th>
-                    <th style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>Intento</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estudiante</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Nota</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Inicio</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Envío</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Intento</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(data.filas ?? []).map((f) => {
+                  {pagedFilas.map((f) => {
                     const est = f.estudiante
                     const estudianteLabel = `${est.documento} — ${est.nombres} ${est.apellidos}`
                     const nota = typeof f.resultado?.notaSobre5 === 'number' ? f.resultado.notaSobre5.toFixed(2) : ''
                     return (
                       <tr key={f.intentoId}>
-                        <td style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>
-                          {estudianteLabel}
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>
+                          <div
+                            title={estudianteLabel}
+                            style={{
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {estudianteLabel}
+                          </div>
                         </td>
-                        <td style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)', fontWeight: 800 }}>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', fontWeight: 800, whiteSpace: 'nowrap' }}>
                           {nota}
                         </td>
-                        <td style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
                           {formatLocalDateTime(f.startedAt)}
                         </td>
-                        <td style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
                           {formatLocalDateTime(f.submittedAt)}
                         </td>
-                        <td style={{ padding: '8px 6px', borderBottom: '1px solid var(--wg-border)' }}>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
                           {f.intentoId}
                         </td>
                       </tr>
@@ -287,7 +373,7 @@ export function ResultsView() {
                 </tbody>
               </table>
 
-              {Array.isArray(data.filas) && data.filas.length === 0 ? (
+              {filas.length === 0 ? (
                 <p className="muted" style={{ margin: '8px 0 0', fontSize: 13 }}>
                   No hay intentos enviados para esta configuración.
                 </p>

@@ -143,6 +143,25 @@
   gap: 6px;
 }
 
+.resultsFiltersGrid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  align-items: end;
+}
+
+@media (max-width: 900px) {
+  .resultsFiltersGrid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .resultsFiltersGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .field label {
   display: block;
   font-size: 13px;
