@@ -38,6 +38,14 @@ function optionsFor(p: PreguntaGeneratedResponse) {
   ]
 }
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (!err || typeof err !== 'object') return fallback
+  const msg = (err as Record<string, unknown>).message
+  if (typeof msg === 'string' && msg.trim()) return msg
+  if (msg == null) return fallback
+  return String(msg)
+}
+
 export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const durationMinutes = useMemo(
     () => assertFinitePositive(EXAM_DURATION_MINUTES, 'VITE_EXAM_DURATION_MINUTES'),
@@ -59,6 +67,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [hydrated, setHydrated] = useState(false)
   const [submittedDetail, setSubmittedDetail] = useState<IntentoDetalleResponse | null>(null)
+  const [currentIdx, setCurrentIdx] = useState(0)
 
   const retryTimerRef = useRef<number | null>(null)
   const lastWarnAtRef = useRef<number>(0)
@@ -66,12 +75,15 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const hadFullscreenRef = useRef<boolean>(false)
   const autoSubmitTriggeredRef = useRef<boolean>(false)
 
+  const navInitializedRef = useRef<boolean>(false)
+
   const leaveSinceRef = useRef<number | null>(null)
   const leaveWarnedRef = useRef<boolean>(false)
 
   // restore draft
   useEffect(() => {
     setHydrated(false)
+    navInitializedRef.current = false
     const draft = loadAttemptDraft(intento.intentoId)
     const serverAnswers = answersFromServer('respuestas' in intento ? intento.respuestas : undefined)
     const hasServerAnswers = Object.keys(serverAnswers).length > 0
@@ -112,6 +124,24 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     })
     setHydrated(true)
   }, [intento])
+
+  // Initialize the question page (once per attempt) to the first unanswered question.
+  useEffect(() => {
+    if (!hydrated) return
+    if (navInitializedRef.current) return
+    navInitializedRef.current = true
+
+    const firstUnansweredIdx = intento.preguntas.findIndex((p) => !answersByPreguntaId[String(p.id)])
+    setCurrentIdx(firstUnansweredIdx >= 0 ? firstUnansweredIdx : 0)
+  }, [hydrated, intento.preguntas, answersByPreguntaId])
+
+  // Clamp page index if question list changes.
+  useEffect(() => {
+    setCurrentIdx((prev) => {
+      const max = Math.max(0, intento.preguntas.length - 1)
+      return Math.min(Math.max(0, prev), max)
+    })
+  }, [intento.preguntas.length])
 
   // Reflect backend state if the attempt was already submitted.
   useEffect(() => {
@@ -209,9 +239,9 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       } else {
         setPendingSubmit(true)
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setPendingSubmit(true)
-      setError(e?.message ? String(e.message) : 'Error enviando respuestas')
+      setError(extractErrorMessage(e, 'Error enviando respuestas'))
     } finally {
       setSubmitting(false)
     }
@@ -380,8 +410,13 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     intento.preguntas.length > 0 &&
     (missingCount === 0 || isTimeUp)
 
+  const totalPreguntas = intento.preguntas.length
+  const currentPregunta = totalPreguntas > 0 ? intento.preguntas[currentIdx] : null
+  const selected = currentPregunta ? answersByPreguntaId[String(currentPregunta.id)] : undefined
+  const corr = currentPregunta && isSubmitted ? correccionByPreguntaId.get(currentPregunta.id) : undefined
+
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'left' }}>
+    <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
         <h2>Examen (intento #{intento.intentoId})</h2>
         <div style={{ textAlign: 'right' }}>
@@ -468,55 +503,77 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       ) : null}
 
-      <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
-        {intento.preguntas.map((p, idx) => {
-          const selected = answersByPreguntaId[String(p.id)]
-          const corr = isSubmitted ? correccionByPreguntaId.get(p.id) : undefined
-          return (
-            <div key={p.id} style={{ border: '1px solid currentColor', borderRadius: 8, padding: 12 }}>
-              <div style={{ marginBottom: 8 }}>
-                <strong>{idx + 1}.</strong> {p.enunciado}
-                {isSubmitted && corr ? (
-                  <span style={{ marginLeft: 12, opacity: 0.85 }}>
-                    · <strong>{corr.esCorrecta ? 'Correcta' : 'Incorrecta'}</strong>
-                  </span>
-                ) : null}
-              </div>
-              <div style={{ display: 'grid', gap: 6 }}>
-                {optionsFor(p).map((o) => (
-                  <label key={o.key} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      type="radio"
-                      name={`p-${p.id}`}
-                      checked={selected === o.key}
-                      onChange={() => setAnswer(p.id, o.key)}
-                      disabled={submitOk || isTimeUp || blocked}
-                    />
-                    <span>
-                      <strong>{o.key}.</strong> {o.text}
-                    </span>
-                  </label>
-                ))}
-              </div>
+      <div style={{ marginTop: 16 }} className="stack">
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 14 }} className="muted">
+            Pregunta <strong>{totalPreguntas ? currentIdx + 1 : 0}</strong> / {totalPreguntas}
+          </div>
+          <div className="row">
+            <button
+              className="btnSecondary"
+              disabled={totalPreguntas === 0 || currentIdx <= 0}
+              onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
+            >
+              Anterior
+            </button>
+            <button
+              className="btnSecondary"
+              disabled={totalPreguntas === 0 || currentIdx >= totalPreguntas - 1}
+              onClick={() => setCurrentIdx((i) => Math.min(totalPreguntas - 1, i + 1))}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
 
+        {currentPregunta ? (
+          <div className="card">
+            <div style={{ marginBottom: 10 }}>
+              <strong>{currentIdx + 1}.</strong> {currentPregunta.enunciado}
               {isSubmitted && corr ? (
-                <div style={{ marginTop: 10, opacity: 0.9 }}>
-                  <div>
-                    <strong>Tu respuesta:</strong> {corr.respuestaEstudiante ?? 'Sin responder'}
-                  </div>
-                  <div>
-                    <strong>Correcta:</strong> {corr.respuestaCorrecta}
-                  </div>
-                  {corr.explicacion ? (
-                    <div style={{ marginTop: 6 }}>
-                      <strong>Explicación:</strong> {corr.explicacion}
-                    </div>
-                  ) : null}
-                </div>
+                <span style={{ marginLeft: 12, opacity: 0.85 }}>
+                  · <strong>{corr.esCorrecta ? 'Correcta' : 'Incorrecta'}</strong>
+                </span>
               ) : null}
             </div>
-          )
-        })}
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              {optionsFor(currentPregunta).map((o) => (
+                <label key={o.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <input
+                    type="radio"
+                    name={`p-${currentPregunta.id}`}
+                    checked={selected === o.key}
+                    onChange={() => setAnswer(currentPregunta.id, o.key)}
+                    disabled={submitOk || isTimeUp || blocked}
+                    style={{ marginTop: 4 }}
+                  />
+                  <span>
+                    <strong>{o.key}.</strong> {o.text}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {isSubmitted && corr ? (
+              <div style={{ marginTop: 12, opacity: 0.95 }}>
+                <div>
+                  <strong>Tu respuesta:</strong> {corr.respuestaEstudiante ?? 'Sin responder'}
+                </div>
+                <div>
+                  <strong>Correcta:</strong> {corr.respuestaCorrecta}
+                </div>
+                {corr.explicacion ? (
+                  <div style={{ marginTop: 8 }}>
+                    <strong>Explicación:</strong> {corr.explicacion}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="card muted">No hay preguntas para mostrar.</div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
