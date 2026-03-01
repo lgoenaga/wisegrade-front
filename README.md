@@ -20,11 +20,28 @@ npm install
 npm run dev
 ```
 
-### Flujo implementado (Fase 3 - mínimo)
+### Flujo implementado (Fase 3 + antitrampa)
 
 - Iniciar intento: `POST /api/intentos/iniciar`
 - Presentar preguntas y guardar respuestas en LocalStorage
 - Enviar: `POST /api/intentos/enviar` con reintentos automáticos si falla
+- Reanudar tras refresh: usa un snapshot del intento + respuestas guardadas
+
+Antitrampa (mínimo):
+
+- Cambio de pestaña / pérdida de foco / salida de fullscreen
+- 3 advertencias ⇒ bloqueo de responder
+- Al bloquear ⇒ auto-envío del intento
+- Tras enviar (`SUBMITTED`) se muestra aviso de “no se puede presentar nuevamente” y el cronómetro queda congelado
+
+### LocalStorage
+
+Claves usadas:
+
+- `wisegrade:attempt:<intentoId>` (borrador: respuestas, warnings, pending)
+- `wisegrade:lastAttemptId`
+
+Para re-probar desde cero: borra las claves `wisegrade:*`.
 
 ---
 
