@@ -175,34 +175,40 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       }
       warnAntiCheat('Pérdida de foco/cambio de aplicación detectado', 'leave')
     }
-    function onFocusOutCapture() {
-      if (suppressNextBlurRef.current) {
-        suppressNextBlurRef.current = false
-        return
-      }
-      warnAntiCheat('Pérdida de foco/cambio de aplicación detectado', 'leave')
-    }
     function onPageHide() {
       warnAntiCheat('Salida de la página detectada', 'pagehide')
     }
 
-    let hadFocus = document.hasFocus()
+    // Firefox/Chromium may not always fire blur/visibility in all app-switch scenarios.
+    // We use a debounced document.hasFocus() poll, but we MUST NOT listen to `focusout`
+    // because it fires for normal in-page focus changes (e.g. clicking a radio input).
+    let hadWindowFocus = document.hasFocus()
+    let lostFocusSince: number | null = null
     const focusPollId = window.setInterval(() => {
       const hasFocus = document.hasFocus()
-      if (hadFocus && !hasFocus) {
-        onFocusOutCapture()
+      if (hasFocus) {
+        hadWindowFocus = true
+        lostFocusSince = null
+        return
       }
-      hadFocus = hasFocus
+
+      // Only warn if we've been unfocused for a short, continuous period.
+      if (lostFocusSince == null) {
+        lostFocusSince = Date.now()
+        return
+      }
+      if (hadWindowFocus && Date.now() - lostFocusSince >= 800) {
+        warnAntiCheat('Pérdida de foco/cambio de aplicación detectado', 'leave')
+        hadWindowFocus = false
+      }
     }, 500)
 
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('blur', onBlur, true)
-    window.addEventListener('focusout', onFocusOutCapture, true)
     window.addEventListener('pagehide', onPageHide)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('blur', onBlur, true)
-      window.removeEventListener('focusout', onFocusOutCapture, true)
       window.removeEventListener('pagehide', onPageHide)
       window.clearInterval(focusPollId)
     }

@@ -35,12 +35,16 @@ function App() {
       const res = await apiPostJson<IntentoIniciarResponse>('/api/intentos/iniciar', req)
       setAttempt(res)
 
+      const existingDraft = loadAttemptDraft(res.intentoId)
+
       saveAttemptDraft({
         intentoSnapshot: res,
-        answersByPreguntaId: {},
-        pendingSubmit: false,
-        antiCheatWarnings: 0,
-        blocked: false,
+        answersByPreguntaId: existingDraft?.answersByPreguntaId ?? {},
+        pendingSubmit: existingDraft?.pendingSubmit ?? false,
+        antiCheatWarnings: Number.isFinite(existingDraft?.antiCheatWarnings)
+          ? (existingDraft?.antiCheatWarnings as number)
+          : 0,
+        blocked: existingDraft?.blocked ?? false,
       })
       saveLastAttemptId(res.intentoId)
     } catch (e: any) {
