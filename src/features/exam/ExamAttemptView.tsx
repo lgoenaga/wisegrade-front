@@ -75,6 +75,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const lastWarnKeyRef = useRef<string>('')
   const hadFullscreenRef = useRef<boolean>(false)
   const autoSubmitTriggeredRef = useRef<boolean>(false)
+  const timeAutoSubmitTriggeredRef = useRef<boolean>(false)
 
   const navInitializedRef = useRef<boolean>(false)
 
@@ -86,6 +87,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     setHydrated(false)
     navInitializedRef.current = false
     setError(null)
+    timeAutoSubmitTriggeredRef.current = false
     const draft = loadAttemptDraft(intento.intentoId)
     setAttemptMeta(draft?.meta ?? null)
     const serverAnswers = answersFromServer('respuestas' in intento ? intento.respuestas : undefined)
@@ -399,6 +401,20 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const mm = String(Math.floor(remainingSec / 60)).padStart(2, '0')
   const ss = String(remainingSec % 60).padStart(2, '0')
   const isTimeUp = remainingMs <= 0
+
+  // auto-submit when time is up
+  useEffect(() => {
+    if (!isTimeUp) return
+    if (submitOk) return
+    if (submitting) return
+    if (pendingSubmit) return
+    if (timeAutoSubmitTriggeredRef.current) return
+    timeAutoSubmitTriggeredRef.current = true
+
+    setPendingSubmit(true)
+    void trySubmit(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeUp, submitOk, submitting, pendingSubmit])
 
   const answeredCount = intento.preguntas.reduce((acc, p) => {
     return answersByPreguntaId[String(p.id)] ? acc + 1 : acc
