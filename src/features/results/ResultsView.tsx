@@ -28,6 +28,13 @@ function formatLocalDateTime(value: string | null | undefined): string {
   return value.replace('T', ' ')
 }
 
+function formatLocalDateTimeHM(value: string | null | undefined): string {
+  const raw = formatLocalDateTime(value)
+  if (!raw) return ''
+  // Expecting "YYYY-MM-DD HH:mm:ss..."; keep only date + hour:minute.
+  return raw.length >= 16 ? raw.slice(0, 16) : raw
+}
+
 function calcResultsPageSize(viewportWidth: number, viewportHeight: number): 10 | 15 {
   // Keep it intentionally simple: prefer 15 only on large screens.
   if (viewportWidth >= 900 && viewportHeight >= 900) return 15
@@ -321,48 +328,53 @@ export function ResultsView() {
             <div className="card" style={{ padding: 8, overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                 <colgroup>
-                  <col style={{ width: '42%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '30%' }} />
                   <col style={{ width: '10%' }} />
                   <col style={{ width: '18%' }} />
                   <col style={{ width: '18%' }} />
-                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '10%' }} />
                 </colgroup>
                 <thead>
                   <tr style={{ textAlign: 'left' }}>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Documento</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estudiante</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Nota</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Inicio</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Envío</th>
-                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Intento</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>No Examen</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pagedFilas.map((f) => {
                     const est = f.estudiante
-                    const estudianteLabel = `${est.documento} — ${est.nombres} ${est.apellidos}`
+                    const estudianteNombre = `${est.nombres} ${est.apellidos}`
                     const nota = typeof f.resultado?.notaSobre5 === 'number' ? f.resultado.notaSobre5.toFixed(2) : ''
                     return (
                       <tr key={f.intentoId}>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
+                          {est.documento}
+                        </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>
                           <div
-                            title={estudianteLabel}
+                            title={estudianteNombre}
                             style={{
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                             }}
                           >
-                            {estudianteLabel}
+                            {estudianteNombre}
                           </div>
                         </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', fontWeight: 800, whiteSpace: 'nowrap' }}>
                           {nota}
                         </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
-                          {formatLocalDateTime(f.startedAt)}
+                          {formatLocalDateTimeHM(f.startedAt)}
                         </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
-                          {formatLocalDateTime(f.submittedAt)}
+                          {formatLocalDateTimeHM(f.submittedAt)}
                         </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
                           {f.intentoId}
