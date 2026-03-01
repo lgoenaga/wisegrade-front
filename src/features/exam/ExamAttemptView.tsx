@@ -173,7 +173,11 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         suppressNextBlurRef.current = false
         return
       }
-      warnAntiCheat('Pérdida de foco/cambio de aplicación detectado', 'leave')
+      // Do not warn immediately: some browsers may emit transient blur events.
+      // The focus poll below will confirm sustained loss of focus.
+      if (lostFocusSince == null) {
+        lostFocusSince = Date.now()
+      }
     }
     function onPageHide() {
       warnAntiCheat('Salida de la página detectada', 'pagehide')
