@@ -64,6 +64,7 @@ function App() {
 
           saveAttemptDraft({
             intentoSnapshot: serverAttempt,
+            meta: draft?.meta,
             answersByPreguntaId,
             pendingSubmit: false,
             antiCheatWarnings: Number.isFinite(draft?.antiCheatWarnings)
@@ -111,7 +112,7 @@ function App() {
     }
   }, [])
 
-  async function handleStart(req: IntentoIniciarRequest) {
+  async function handleStart(req: IntentoIniciarRequest, meta?: { materiaNombre?: string }) {
     setBusy(true)
     setError(undefined)
     try {
@@ -127,6 +128,7 @@ function App() {
 
         saveAttemptDraft({
           intentoSnapshot: serverAttempt,
+          meta: meta?.materiaNombre ? { materiaNombre: meta.materiaNombre } : undefined,
           answersByPreguntaId,
           pendingSubmit: false,
           antiCheatWarnings: 0,
@@ -139,9 +141,13 @@ function App() {
       setAttempt(res)
 
       const existingDraft = loadAttemptDraft(res.intentoId)
+      const mergedMeta = meta?.materiaNombre
+        ? { materiaNombre: meta.materiaNombre }
+        : existingDraft?.meta
 
       saveAttemptDraft({
         intentoSnapshot: res,
+        meta: mergedMeta,
         answersByPreguntaId: existingDraft?.answersByPreguntaId ?? {},
         pendingSubmit: existingDraft?.pendingSubmit ?? false,
         antiCheatWarnings: Number.isFinite(existingDraft?.antiCheatWarnings)

@@ -3,6 +3,9 @@ import type { IntentoSnapshot, RespuestaCorrecta } from './types'
 
 export type AttemptDraft = {
   intentoSnapshot: IntentoSnapshot
+  meta?: {
+    materiaNombre?: string
+  }
   answersByPreguntaId: Record<string, RespuestaCorrecta>
   pendingSubmit: boolean
   antiCheatWarnings: number

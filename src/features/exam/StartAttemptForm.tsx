@@ -3,7 +3,7 @@ import { apiGetJson } from '../../lib/api'
 import type { IntentoIniciarRequest } from './types'
 
 type Props = {
-  onStart: (req: IntentoIniciarRequest) => void
+  onStart: (req: IntentoIniciarRequest, meta?: { materiaNombre?: string }) => void
   busy: boolean
   error?: string
 }
@@ -129,6 +129,11 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
     parsed.docenteResponsableId &&
     parsed.estudianteId &&
     parsed.cantidad
+
+  const selectedMateriaNombre = useMemo(() => {
+    if (!parsed.materiaId) return null
+    return materias.find((m) => m.id === parsed.materiaId)?.nombre ?? null
+  }, [materias, parsed.materiaId])
 
   const displayError = useMemo(() => {
     if (!error) return null
@@ -299,7 +304,7 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
                 docenteResponsableId: parsed.docenteResponsableId!,
                 estudianteId: parsed.estudianteId!,
                 cantidad: parsed.cantidad!,
-              })
+              }, { materiaNombre: selectedMateriaNombre ?? undefined })
             }
           >
             {busy ? 'Iniciando…' : 'Iniciar'}
