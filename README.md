@@ -118,5 +118,6 @@ Para re-probar desde cero: borra claves `wisegrade:*` en el navegador.
 ## Troubleshooting
 
 - **CORS / cookies de sesión**: revisa `APP_CORS_ALLOWED_ORIGINS` en el backend (default `http://localhost:5173`).
+- **Login falla**: si documento/clave no coinciden, el backend responde `401` con `"Credenciales inválidas"`.
 - **"Examen not found"**: falta cargar banco de preguntas para esa combinación (o falta asociación docente↔materia).
 - **Se queda en "pending submit"**: normalmente es backend caído/red inestable; al volver el backend el frontend reintenta cada ~5s.
