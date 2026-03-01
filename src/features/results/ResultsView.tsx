@@ -177,8 +177,8 @@ export function ResultsView() {
   }, [filas, page, pageSize])
 
   return (
-    <div style={{ width: '100%', textAlign: 'left', margin: '0 -8px' }}>
-      <div className="card stack">
+    <div className="resultsContainer">
+      <div className="card stack resultsCard">
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>Resultados</h2>
           <p className="muted" style={{ marginTop: 3, marginBottom: 0, fontSize: 13 }}>
