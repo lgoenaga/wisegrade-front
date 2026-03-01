@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { apiPostJson } from '../../lib/api'
+import { apiGetJson, apiPostJson } from '../../lib/api'
 import { EXAM_DURATION_MINUTES, assertFinitePositive } from '../../lib/config'
 import { loadAttemptDraft, saveAttemptDraft } from './examStorage'
 import type {
   IntentoEnviarRequest,
   IntentoEnviarResponse,
+  IntentoDetalleResponse,
   IntentoSnapshot,
   PreguntaGeneratedResponse,
+  CorreccionPreguntaResponse,
   RespuestaGuardadaResponse,
   RespuestaCorrecta,
 } from './types'
@@ -56,6 +58,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const [antiCheatNote, setAntiCheatNote] = useState<string | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [hydrated, setHydrated] = useState(false)
+  const [submittedDetail, setSubmittedDetail] = useState<IntentoDetalleResponse | null>(null)
 
   const retryTimerRef = useRef<number | null>(null)
   const lastWarnAtRef = useRef<number>(0)
@@ -117,6 +120,42 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       setPendingSubmit(false)
     }
   }, [intento.estado])
+
+  const isSubmitted = submitOk || intento.estado === 'SUBMITTED'
+
+  useEffect(() => {
+    if (!isSubmitted) {
+      setSubmittedDetail(null)
+      return
+    }
+
+    // If current snapshot is already a detalle response, use it directly.
+    if ('resultado' in intento && 'correccion' in intento) {
+      setSubmittedDetail(intento as IntentoDetalleResponse)
+      return
+    }
+
+    const controller = new AbortController()
+    ;(async () => {
+      try {
+        const detalle = await apiGetJson<IntentoDetalleResponse>(`/api/intentos/${intento.intentoId}`, controller.signal)
+        setSubmittedDetail(detalle)
+      } catch {
+        // If it fails, keep showing the submitted state without correction.
+      }
+    })()
+
+    return () => controller.abort()
+  }, [isSubmitted, intento])
+
+  const correccionByPreguntaId = useMemo(() => {
+    const map = new Map<number, CorreccionPreguntaResponse>()
+    if (!submittedDetail?.correccion) return map
+    for (const c of submittedDetail.correccion) {
+      map.set(c.preguntaId, c)
+    }
+    return map
+  }, [submittedDetail])
 
   // countdown tick (freeze once submitted)
   useEffect(() => {
@@ -367,6 +406,20 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </p>
       ) : null}
 
+      {isSubmitted ? (
+        <div style={{ marginTop: 12 }}>
+          <strong>Resultado:</strong>{' '}
+          {submittedDetail?.resultado ? (
+            <span>
+              {submittedDetail.resultado.correctas}/{submittedDetail.resultado.total} correctas · Nota:{' '}
+              {submittedDetail.resultado.notaSobre5.toFixed(2)}/5.00
+            </span>
+          ) : (
+            <span style={{ opacity: 0.8 }}>Calificación no disponible (aún).</span>
+          )}
+        </div>
+      ) : null}
+
       {!submitOk ? (
         <div style={{ marginTop: 8, opacity: 0.8 }}>
           Antitrampa: <strong>{blocked ? 'BLOQUEADO' : `${antiCheatWarnings}/3`}</strong>
@@ -418,10 +471,16 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
         {intento.preguntas.map((p, idx) => {
           const selected = answersByPreguntaId[String(p.id)]
+          const corr = isSubmitted ? correccionByPreguntaId.get(p.id) : undefined
           return (
             <div key={p.id} style={{ border: '1px solid currentColor', borderRadius: 8, padding: 12 }}>
               <div style={{ marginBottom: 8 }}>
                 <strong>{idx + 1}.</strong> {p.enunciado}
+                {isSubmitted && corr ? (
+                  <span style={{ marginLeft: 12, opacity: 0.85 }}>
+                    · <strong>{corr.esCorrecta ? 'Correcta' : 'Incorrecta'}</strong>
+                  </span>
+                ) : null}
               </div>
               <div style={{ display: 'grid', gap: 6 }}>
                 {optionsFor(p).map((o) => (
@@ -439,6 +498,22 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
                   </label>
                 ))}
               </div>
+
+              {isSubmitted && corr ? (
+                <div style={{ marginTop: 10, opacity: 0.9 }}>
+                  <div>
+                    <strong>Tu respuesta:</strong> {corr.respuestaEstudiante ?? 'Sin responder'}
+                  </div>
+                  <div>
+                    <strong>Correcta:</strong> {corr.respuestaCorrecta}
+                  </div>
+                  {corr.explicacion ? (
+                    <div style={{ marginTop: 6 }}>
+                      <strong>Explicación:</strong> {corr.explicacion}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           )
         })}
