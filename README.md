@@ -8,7 +8,9 @@ Su función principal es que un estudiante pueda:
 - Responder preguntas (guardando progreso local).
 - Enviar el intento al backend con tolerancia a fallos de red.
 
-Documentación de snapshot del estado actual: ver `Documents/frontend-summary.md`.
+Además soporta autenticación por **sesión** (login) y UI por rol (estudiante/docente/admin).
+
+Documentación de snapshot del estado actual: ver `../Documents/frontend-summary.md`.
 
 ---
 
@@ -60,11 +62,22 @@ cd ../backend
 ```
 
 3. Inicia el frontend (`npm run dev`).
-4. En la pantalla inicial pega los IDs (periodo/materia/momento/docente/estudiante) e inicia el intento.
+4. Inicia sesión:
+
+- Admin: puede iniciar intento o ver resultados.
+- Docente: solo ve Resultados.
+- Estudiante: solo presenta examen (estudiante fijo por sesión).
+
+5. Si estás como admin, en la pantalla inicial pega los IDs (periodo/materia/momento/docente/estudiante) e inicia el intento.
 
 ---
 
 ## Endpoints que consume
+
+- Auth (sesión):
+  - `POST /api/auth/login`
+  - `GET /api/auth/me`
+  - `POST /api/auth/logout`
 
 - Catálogos:
   - `GET /api/periodos`
@@ -76,7 +89,7 @@ cd ../backend
   - `POST /api/intentos/enviar`
   - `GET /api/intentos/{intentoId}`
 
-Además, incluye una pantalla de **Resultados** (visible para todos por ahora) para consultar intentos SUBMITTED por configuración:
+Incluye una pantalla de **Resultados** para consultar intentos SUBMITTED por configuración:
 
 - `GET /api/examenes/resultados?periodoId=...&materiaId=...&momentoId=...&docenteResponsableId=...`
 
@@ -104,6 +117,6 @@ Para re-probar desde cero: borra claves `wisegrade:*` en el navegador.
 
 ## Troubleshooting
 
-- **CORS error**: revisa `APP_CORS_ALLOWED_ORIGINS` en el backend (default `http://localhost:5173`).
+- **CORS / cookies de sesión**: revisa `APP_CORS_ALLOWED_ORIGINS` en el backend (default `http://localhost:5173`).
 - **"Examen not found"**: falta cargar banco de preguntas para esa combinación (o falta asociación docente↔materia).
 - **Se queda en "pending submit"**: normalmente es backend caído/red inestable; al volver el backend el frontend reintenta cada ~5s.
