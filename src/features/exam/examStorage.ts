@@ -1,8 +1,8 @@
 import { loadJson, remove, saveJson } from '../../lib/storage'
-import type { IntentoIniciarResponse, RespuestaCorrecta } from './types'
+import type { IntentoSnapshot, RespuestaCorrecta } from './types'
 
 export type AttemptDraft = {
-  intentoSnapshot: IntentoIniciarResponse
+  intentoSnapshot: IntentoSnapshot
   answersByPreguntaId: Record<string, RespuestaCorrecta>
   pendingSubmit: boolean
   antiCheatWarnings: number

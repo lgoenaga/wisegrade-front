@@ -5,14 +5,25 @@ import { loadAttemptDraft, saveAttemptDraft } from './examStorage'
 import type {
   IntentoEnviarRequest,
   IntentoEnviarResponse,
-  IntentoIniciarResponse,
+  IntentoSnapshot,
   PreguntaGeneratedResponse,
+  RespuestaGuardadaResponse,
   RespuestaCorrecta,
 } from './types'
 
 type Props = {
-  intento: IntentoIniciarResponse
+  intento: IntentoSnapshot
   onSubmitted: (attemptId: number) => void
+}
+
+function answersFromServer(respuestas: RespuestaGuardadaResponse[] | undefined): Record<string, RespuestaCorrecta> {
+  const map: Record<string, RespuestaCorrecta> = {}
+  if (!Array.isArray(respuestas)) return map
+  for (const r of respuestas) {
+    if (!r) continue
+    map[String(r.preguntaId)] = r.respuesta
+  }
+  return map
 }
 
 function optionsFor(p: PreguntaGeneratedResponse) {
@@ -44,31 +55,59 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [antiCheatNote, setAntiCheatNote] = useState<string | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [hydrated, setHydrated] = useState(false)
 
   const retryTimerRef = useRef<number | null>(null)
   const lastWarnAtRef = useRef<number>(0)
   const lastWarnKeyRef = useRef<string>('')
   const hadFullscreenRef = useRef<boolean>(false)
-  const suppressNextBlurRef = useRef<boolean>(false)
   const autoSubmitTriggeredRef = useRef<boolean>(false)
+
+  const leaveSinceRef = useRef<number | null>(null)
+  const leaveWarnedRef = useRef<boolean>(false)
 
   // restore draft
   useEffect(() => {
+    setHydrated(false)
     const draft = loadAttemptDraft(intento.intentoId)
+    const serverAnswers = answersFromServer('respuestas' in intento ? intento.respuestas : undefined)
+    const hasServerAnswers = Object.keys(serverAnswers).length > 0
+    const hasServerSnapshot = 'respuestas' in intento
+    const shouldTrustServer = hasServerSnapshot && (intento.estado === 'SUBMITTED' || hasServerAnswers)
+
+    if (shouldTrustServer) {
+      setAnswersByPreguntaId(serverAnswers)
+      setPendingSubmit(false)
+      setAntiCheatWarnings(Number.isFinite(draft?.antiCheatWarnings) ? (draft?.antiCheatWarnings as number) : 0)
+      setBlocked(Boolean(draft?.blocked))
+      saveAttemptDraft({
+        intentoSnapshot: intento,
+        answersByPreguntaId: serverAnswers,
+        pendingSubmit: false,
+        antiCheatWarnings: Number.isFinite(draft?.antiCheatWarnings) ? (draft?.antiCheatWarnings as number) : 0,
+        blocked: draft?.blocked ?? false,
+      })
+      setHydrated(true)
+      return
+    }
+
     if (draft) {
       setAnswersByPreguntaId(draft.answersByPreguntaId ?? {})
       setPendingSubmit(Boolean(draft.pendingSubmit))
       setAntiCheatWarnings(Number.isFinite(draft.antiCheatWarnings) ? draft.antiCheatWarnings : 0)
       setBlocked(Boolean(draft.blocked))
-    } else {
-      saveAttemptDraft({
-        intentoSnapshot: intento,
-        answersByPreguntaId: {},
-        pendingSubmit: false,
-        antiCheatWarnings: 0,
-        blocked: false,
-      })
+      setHydrated(true)
+      return
     }
+
+    saveAttemptDraft({
+      intentoSnapshot: intento,
+      answersByPreguntaId: {},
+      pendingSubmit: false,
+      antiCheatWarnings: 0,
+      blocked: false,
+    })
+    setHydrated(true)
   }, [intento])
 
   // Reflect backend state if the attempt was already submitted.
@@ -90,6 +129,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
 
   // persist answers & pending flag
   useEffect(() => {
+    if (!hydrated) return
     saveAttemptDraft({
       intentoSnapshot: submitOk ? { ...intento, estado: 'SUBMITTED' } : intento,
       answersByPreguntaId,
@@ -97,7 +137,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       antiCheatWarnings,
       blocked,
     })
-  }, [answersByPreguntaId, pendingSubmit, antiCheatWarnings, blocked, intento, submitOk])
+  }, [answersByPreguntaId, pendingSubmit, antiCheatWarnings, blocked, intento, submitOk, hydrated])
 
   async function trySubmit(force: boolean = false) {
     if (submitting) return
@@ -160,59 +200,75 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     })
   }
 
-  // anti-cheat: tab change + blur
+  // anti-cheat: tab change + focus loss (count once per leave episode)
   useEffect(() => {
+    function resetLeaveEpisodeIfBack() {
+      if (document.visibilityState === 'visible' && document.hasFocus()) {
+        leaveSinceRef.current = null
+        leaveWarnedRef.current = false
+      }
+    }
+
+    function markLeft() {
+      if (leaveSinceRef.current == null) {
+        leaveSinceRef.current = Date.now()
+      }
+    }
+
+    function warnOnce(reason: string) {
+      if (leaveWarnedRef.current) return
+      leaveWarnedRef.current = true
+      warnAntiCheat(reason, 'leave')
+    }
+
     function onVisibility() {
       if (document.visibilityState === 'hidden') {
-        suppressNextBlurRef.current = true
-        warnAntiCheat('Cambio de pestaña/ventana detectado', 'leave')
+        markLeft()
+        // When the tab is hidden, it's definitely a leave episode: warn immediately.
+        warnOnce('Cambio de pestaña/ventana detectado')
+      } else {
+        resetLeaveEpisodeIfBack()
       }
-    }
-    function onBlur() {
-      if (suppressNextBlurRef.current) {
-        suppressNextBlurRef.current = false
-        return
-      }
-      // Do not warn immediately: some browsers may emit transient blur events.
-      // The focus poll below will confirm sustained loss of focus.
-      if (lostFocusSince == null) {
-        lostFocusSince = Date.now()
-      }
-    }
-    function onPageHide() {
-      warnAntiCheat('Salida de la página detectada', 'pagehide')
     }
 
-    // Firefox/Chromium may not always fire blur/visibility in all app-switch scenarios.
-    // We use a debounced document.hasFocus() poll, but we MUST NOT listen to `focusout`
-    // because it fires for normal in-page focus changes (e.g. clicking a radio input).
-    let hadWindowFocus = document.hasFocus()
-    let lostFocusSince: number | null = null
+    function onBlur() {
+      // Blur can be transient; only mark the leave episode and let the poll confirm.
+      markLeft()
+    }
+
+    function onFocus() {
+      resetLeaveEpisodeIfBack()
+    }
+
+    function onPageHide() {
+      markLeft()
+      warnOnce('Salida de la página detectada')
+    }
+
+    // Debounced focus poll for browsers that miss events.
     const focusPollId = window.setInterval(() => {
+      resetLeaveEpisodeIfBack()
+
+      if (leaveWarnedRef.current) return
+      if (leaveSinceRef.current == null) return
+
       const hasFocus = document.hasFocus()
-      if (hasFocus) {
-        hadWindowFocus = true
-        lostFocusSince = null
-        return
-      }
+      if (hasFocus) return
 
       // Only warn if we've been unfocused for a short, continuous period.
-      if (lostFocusSince == null) {
-        lostFocusSince = Date.now()
-        return
+      if (Date.now() - leaveSinceRef.current >= 800) {
+        warnOnce('Pérdida de foco/cambio de aplicación detectado')
       }
-      if (hadWindowFocus && Date.now() - lostFocusSince >= 800) {
-        warnAntiCheat('Pérdida de foco/cambio de aplicación detectado', 'leave')
-        hadWindowFocus = false
-      }
-    }, 500)
+    }, 400)
 
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('blur', onBlur, true)
+    window.addEventListener('focus', onFocus, true)
     window.addEventListener('pagehide', onPageHide)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('blur', onBlur, true)
+      window.removeEventListener('focus', onFocus, true)
       window.removeEventListener('pagehide', onPageHide)
       window.clearInterval(focusPollId)
     }

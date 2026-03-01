@@ -16,6 +16,27 @@ export type IntentoIniciarResponse = {
   preguntas: PreguntaGeneratedResponse[]
 }
 
+export type RespuestaGuardadaResponse = {
+  preguntaId: number
+  respuesta: RespuestaCorrecta
+  respondedAt: string | null
+}
+
+export type IntentoDetalleResponse = {
+  intentoId: number
+  examenId: number
+  estudianteId: number
+  estado: 'IN_PROGRESS' | 'SUBMITTED'
+  startedAt: string
+  firstSubmitAttemptAt: string | null
+  submittedAt: string | null
+  cantidad: number
+  preguntas: PreguntaGeneratedResponse[]
+  respuestas: RespuestaGuardadaResponse[]
+}
+
+export type IntentoSnapshot = IntentoIniciarResponse | IntentoDetalleResponse
+
 export type IntentoEnviarResponse = {
   intentoId: number
   estado: 'IN_PROGRESS' | 'SUBMITTED'
