@@ -99,19 +99,19 @@
   max-width: 980px;
   width: 100%;
   margin: 0 auto;
-  padding: 18px 16px 28px;
+  padding: 12px 16px 20px;
 }
 
 .card {
   background: var(--wg-surface);
   border: 1px solid var(--wg-border);
   border-radius: 14px;
-  padding: 16px;
+  padding: 12px;
 }
 
 .stack {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .row {
