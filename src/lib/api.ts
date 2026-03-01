@@ -41,3 +41,27 @@ export async function apiPostJson<TResponse>(
 
   return (await readJsonSafe(response)) as TResponse
 }
+
+export async function apiGetJson<TResponse>(
+  path: string,
+  signal?: AbortSignal,
+): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal,
+  })
+
+  if (!response.ok) {
+    const raw = await readJsonSafe(response)
+    const message =
+      typeof raw === 'object' && raw && 'message' in raw
+        ? String((raw as any).message)
+        : `HTTP ${response.status}`
+
+    const err: ApiError = { status: response.status, message, raw }
+    throw err
+  }
+
+  return (await readJsonSafe(response)) as TResponse
+}
