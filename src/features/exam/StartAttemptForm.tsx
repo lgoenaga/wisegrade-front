@@ -151,7 +151,7 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
       <div className="card stack">
         <div>
           <h2 style={{ margin: 0 }}>Iniciar examen</h2>
-          <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
+          <p className="muted" style={{ marginTop: 4, marginBottom: 0 }}>
             Selecciona la configuración para generar el intento.
           </p>
         </div>
