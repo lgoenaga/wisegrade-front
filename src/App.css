@@ -40,7 +40,7 @@
 }
 
 .appName {
-  font-size: 28px;
+  font-size: 27px;
   font-weight: 800;
   letter-spacing: 0.2px;
   line-height: 1.05;
@@ -99,7 +99,7 @@
   max-width: 980px;
   width: 100%;
   margin: 0 auto;
-  padding: 4px 16px 14px;
+  padding: 4px 16px 8px;
 }
 
 .card {
