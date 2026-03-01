@@ -40,6 +40,8 @@ function App() {
         intentoSnapshot: res,
         answersByPreguntaId: {},
         pendingSubmit: false,
+        antiCheatWarnings: 0,
+        blocked: false,
       })
       saveLastAttemptId(res.intentoId)
     } catch (e: any) {

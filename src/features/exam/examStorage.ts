@@ -5,6 +5,8 @@ export type AttemptDraft = {
   intentoSnapshot: IntentoIniciarResponse
   answersByPreguntaId: Record<string, RespuestaCorrecta>
   pendingSubmit: boolean
+  antiCheatWarnings: number
+  blocked: boolean
 }
 
 function keyForAttempt(intentoId: number): string {

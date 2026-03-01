@@ -37,11 +37,16 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
 
   const [answersByPreguntaId, setAnswersByPreguntaId] = useState<Record<string, RespuestaCorrecta>>({})
   const [pendingSubmit, setPendingSubmit] = useState(false)
+  const [antiCheatWarnings, setAntiCheatWarnings] = useState(0)
+  const [blocked, setBlocked] = useState(false)
   const [submitOk, setSubmitOk] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [antiCheatNote, setAntiCheatNote] = useState<string | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const retryTimerRef = useRef<number | null>(null)
+  const lastWarnAtRef = useRef<number>(0)
+  const hadFullscreenRef = useRef<boolean>(false)
 
   // restore draft
   useEffect(() => {
@@ -49,11 +54,15 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     if (draft) {
       setAnswersByPreguntaId(draft.answersByPreguntaId ?? {})
       setPendingSubmit(Boolean(draft.pendingSubmit))
+      setAntiCheatWarnings(Number.isFinite(draft.antiCheatWarnings) ? draft.antiCheatWarnings : 0)
+      setBlocked(Boolean(draft.blocked))
     } else {
       saveAttemptDraft({
         intentoSnapshot: intento,
         answersByPreguntaId: {},
         pendingSubmit: false,
+        antiCheatWarnings: 0,
+        blocked: false,
       })
     }
   }, [intento])
@@ -70,8 +79,65 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       intentoSnapshot: intento,
       answersByPreguntaId,
       pendingSubmit,
+      antiCheatWarnings,
+      blocked,
     })
-  }, [answersByPreguntaId, pendingSubmit, intento])
+  }, [answersByPreguntaId, pendingSubmit, antiCheatWarnings, blocked, intento])
+
+  function warnAntiCheat(reason: string) {
+    if (submitOk) return
+    if (blocked) return
+    const now = Date.now()
+    // prevent accidental double increments on noisy events
+    if (now - lastWarnAtRef.current < 800) return
+    lastWarnAtRef.current = now
+
+    setAntiCheatWarnings((prev) => {
+      const next = prev + 1
+      setAntiCheatNote(`${reason}. Advertencia ${next}/3.`)
+      if (next >= 3) {
+        setBlocked(true)
+        setAntiCheatNote('Examen bloqueado por múltiples advertencias.')
+      }
+      return next
+    })
+  }
+
+  // anti-cheat: tab change + blur
+  useEffect(() => {
+    function onVisibility() {
+      if (document.visibilityState === 'hidden') {
+        warnAntiCheat('Cambio de pestaña detectado')
+      }
+    }
+    function onBlur() {
+      warnAntiCheat('Pérdida de foco detectada')
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('blur', onBlur)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitOk, blocked])
+
+  // anti-cheat: fullscreen exit
+  useEffect(() => {
+    function onFsChange() {
+      const isFullscreen = Boolean(document.fullscreenElement)
+      if (isFullscreen) {
+        hadFullscreenRef.current = true
+        return
+      }
+      if (hadFullscreenRef.current) {
+        warnAntiCheat('Salida de pantalla completa detectada')
+      }
+    }
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitOk, blocked])
 
   // auto-retry when pending
   useEffect(() => {
@@ -162,6 +228,18 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
 
       {!submitOk ? (
         <div style={{ marginTop: 8, opacity: 0.8 }}>
+          Antitrampa: <strong>{blocked ? 'BLOQUEADO' : `${antiCheatWarnings}/3`}</strong>
+          {antiCheatWarnings > 0 && !blocked ? (
+            <span>
+              {' '}
+              · Al llegar a 3 se bloquea
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!submitOk ? (
+        <div style={{ marginTop: 8, opacity: 0.8 }}>
           Respondidas: <strong>{answeredCount}</strong> / {intento.preguntas.length}
           {missingCount > 0 ? (
             <span>
@@ -173,6 +251,29 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       ) : null}
 
       {error ? <p style={{ marginTop: 12 }}><strong>Error:</strong> {error}</p> : null}
+
+      {antiCheatNote ? (
+        <p style={{ marginTop: 12 }}>
+          <strong>Antitrampa:</strong> {antiCheatNote}
+        </p>
+      ) : null}
+
+      {!submitOk && !blocked ? (
+        <div style={{ marginTop: 12, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            onClick={async () => {
+              try {
+                await document.documentElement.requestFullscreen()
+                setAntiCheatNote(null)
+              } catch {
+                setAntiCheatNote('No se pudo activar pantalla completa (requiere interacción del navegador).')
+              }
+            }}
+          >
+            Entrar a pantalla completa
+          </button>
+        </div>
+      ) : null}
 
       <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
         {intento.preguntas.map((p, idx) => {
@@ -190,7 +291,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
                       name={`p-${p.id}`}
                       checked={selected === o.key}
                       onChange={() => setAnswer(p.id, o.key)}
-                      disabled={submitOk || isTimeUp}
+                      disabled={submitOk || isTimeUp || blocked}
                     />
                     <span>
                       <strong>{o.key}.</strong> {o.text}
