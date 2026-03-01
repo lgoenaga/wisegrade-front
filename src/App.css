@@ -24,7 +24,7 @@
 }
 
 .appLogo {
-  height: 52px;
+  height: 46px;
   width: auto;
   display: block;
   justify-self: start;
@@ -40,7 +40,7 @@
 }
 
 .appName {
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: 0.2px;
   line-height: 1.05;
@@ -58,11 +58,11 @@
   }
 
   .appLogo {
-    height: 40px;
+    height: 36px;
   }
 
   .appName {
-    font-size: 28px;
+    font-size: 26px;
   }
 
   .appSubtitle {
@@ -77,11 +77,11 @@
   }
 
   .appLogo {
-    height: 36px;
+    height: 32px;
   }
 
   .appName {
-    font-size: 24px;
+    font-size: 22px;
   }
 }
 
