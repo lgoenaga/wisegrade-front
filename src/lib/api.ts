@@ -6,6 +6,14 @@ export type ApiError = {
   raw?: unknown
 }
 
+function extractMessage(raw: unknown, fallback: string): string {
+  if (!raw || typeof raw !== 'object') return fallback
+  const msg = (raw as Record<string, unknown>).message
+  if (typeof msg === 'string' && msg.trim()) return msg
+  if (msg == null) return fallback
+  return String(msg)
+}
+
 async function readJsonSafe(response: Response): Promise<unknown> {
   const text = await response.text()
   if (!text) return null
@@ -30,10 +38,7 @@ export async function apiPostJson<TResponse>(
 
   if (!response.ok) {
     const raw = await readJsonSafe(response)
-    const message =
-      typeof raw === 'object' && raw && 'message' in raw
-        ? String((raw as any).message)
-        : `HTTP ${response.status}`
+    const message = extractMessage(raw, `HTTP ${response.status}`)
 
     const err: ApiError = { status: response.status, message, raw }
     throw err
@@ -54,10 +59,7 @@ export async function apiGetJson<TResponse>(
 
   if (!response.ok) {
     const raw = await readJsonSafe(response)
-    const message =
-      typeof raw === 'object' && raw && 'message' in raw
-        ? String((raw as any).message)
-        : `HTTP ${response.status}`
+    const message = extractMessage(raw, `HTTP ${response.status}`)
 
     const err: ApiError = { status: response.status, message, raw }
     throw err
