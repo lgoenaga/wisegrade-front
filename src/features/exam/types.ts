@@ -22,6 +22,20 @@ export type RespuestaGuardadaResponse = {
   respondedAt: string | null
 }
 
+export type ResultadoIntentoResponse = {
+  correctas: number
+  total: number
+  notaSobre5: number
+}
+
+export type CorreccionPreguntaResponse = {
+  preguntaId: number
+  respuestaEstudiante: RespuestaCorrecta | null
+  respuestaCorrecta: RespuestaCorrecta
+  esCorrecta: boolean
+  explicacion: string | null
+}
+
 export type IntentoDetalleResponse = {
   intentoId: number
   examenId: number
@@ -33,6 +47,8 @@ export type IntentoDetalleResponse = {
   cantidad: number
   preguntas: PreguntaGeneratedResponse[]
   respuestas: RespuestaGuardadaResponse[]
+  resultado: ResultadoIntentoResponse | null
+  correccion: CorreccionPreguntaResponse[]
 }
 
 export type IntentoSnapshot = IntentoIniciarResponse | IntentoDetalleResponse
