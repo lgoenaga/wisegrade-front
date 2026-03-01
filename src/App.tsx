@@ -5,7 +5,6 @@ import { StartAttemptForm } from './features/exam/StartAttemptForm'
 import { ExamAttemptView } from './features/exam/ExamAttemptView'
 import type { IntentoIniciarRequest, IntentoIniciarResponse } from './features/exam/types'
 import {
-  clearAttemptDraft,
   clearLastAttemptId,
   loadAttemptDraft,
   loadLastAttemptId,
@@ -52,9 +51,10 @@ function App() {
   }
 
   function handleSubmitted(attemptId: number) {
-    clearAttemptDraft(attemptId)
-    clearLastAttemptId()
-    setAttempt(null)
+    // Keep the attempt visible after submission so the student sees the final notice.
+    // Mark it as SUBMITTED to persist the state across refresh.
+    setAttempt((prev) => (prev ? { ...prev, estado: 'SUBMITTED' } : prev))
+    saveLastAttemptId(attemptId)
   }
 
   return (

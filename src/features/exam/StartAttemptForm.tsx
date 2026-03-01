@@ -46,6 +46,9 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
         setMaterias(Array.isArray(m) ? m : [])
         setMomentos(Array.isArray(mo) ? mo : [])
       } catch (e: any) {
+        if (ac.signal.aborted || e?.name === 'AbortError') {
+          return
+        }
         setCatalogError(e?.message ? String(e.message) : 'No se pudieron cargar los catálogos')
       }
     }

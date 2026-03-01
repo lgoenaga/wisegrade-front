@@ -44,9 +44,13 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [antiCheatNote, setAntiCheatNote] = useState<string | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
+
   const retryTimerRef = useRef<number | null>(null)
   const lastWarnAtRef = useRef<number>(0)
+  const lastWarnKeyRef = useRef<string>('')
   const hadFullscreenRef = useRef<boolean>(false)
+  const suppressNextBlurRef = useRef<boolean>(false)
+  const autoSubmitTriggeredRef = useRef<boolean>(false)
 
   // restore draft
   useEffect(() => {
@@ -75,30 +79,75 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     }
   }, [intento.estado])
 
-  // countdown tick
+  // countdown tick (freeze once submitted)
   useEffect(() => {
+    if (submitOk) {
+      return
+    }
     const id = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(id)
-  }, [])
+  }, [submitOk])
 
   // persist answers & pending flag
   useEffect(() => {
     saveAttemptDraft({
-      intentoSnapshot: intento,
+      intentoSnapshot: submitOk ? { ...intento, estado: 'SUBMITTED' } : intento,
       answersByPreguntaId,
       pendingSubmit,
       antiCheatWarnings,
       blocked,
     })
-  }, [answersByPreguntaId, pendingSubmit, antiCheatWarnings, blocked, intento])
+  }, [answersByPreguntaId, pendingSubmit, antiCheatWarnings, blocked, intento, submitOk])
 
-  function warnAntiCheat(reason: string) {
+  async function trySubmit(force: boolean = false) {
+    if (submitting) return
     if (submitOk) return
-    if (blocked) return
+    if (!force && missingCount > 0 && !isTimeUp) return
+    setError(null)
+    setSubmitting(true)
+
+    const respuestas = intento.preguntas
+      .map((p) => {
+        const r = answersByPreguntaId[String(p.id)]
+        return r ? { preguntaId: p.id, respuesta: r } : null
+      })
+      .filter(Boolean) as Array<{ preguntaId: number; respuesta: RespuestaCorrecta }>
+
+    const payload: IntentoEnviarRequest = {
+      intentoId: intento.intentoId,
+      respuestas,
+    }
+
+    try {
+      const res = await apiPostJson<IntentoEnviarResponse>('/api/intentos/enviar', payload)
+      if (res.estado === 'SUBMITTED') {
+        setSubmitOk(true)
+        setPendingSubmit(false)
+        if (autoSubmitTriggeredRef.current || blocked) {
+          setAntiCheatNote('Intento enviado automáticamente por antitrampa. No se puede presentar nuevamente.')
+        }
+        onSubmitted(intento.intentoId)
+      } else {
+        setPendingSubmit(true)
+      }
+    } catch (e: any) {
+      setPendingSubmit(true)
+      setError(e?.message ? String(e.message) : 'Error enviando respuestas')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function warnAntiCheat(reason: string, key: string = 'generic') {
+    if (submitOk) return
+    if (blocked) {
+      setAntiCheatNote(`${reason}. Examen ya estaba bloqueado.`)
+      return
+    }
     const now = Date.now()
-    // prevent accidental double increments on noisy events
-    if (now - lastWarnAtRef.current < 800) return
+    if (now - lastWarnAtRef.current < 900 && lastWarnKeyRef.current === key) return
     lastWarnAtRef.current = now
+    lastWarnKeyRef.current = key
 
     setAntiCheatWarnings((prev) => {
       const next = prev + 1
@@ -115,17 +164,47 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   useEffect(() => {
     function onVisibility() {
       if (document.visibilityState === 'hidden') {
-        warnAntiCheat('Cambio de pestaña detectado')
+        suppressNextBlurRef.current = true
+        warnAntiCheat('Cambio de pestaña/ventana detectado', 'leave')
       }
     }
     function onBlur() {
-      warnAntiCheat('Pérdida de foco detectada')
+      if (suppressNextBlurRef.current) {
+        suppressNextBlurRef.current = false
+        return
+      }
+      warnAntiCheat('Pérdida de foco/cambio de aplicación detectado', 'leave')
     }
+    function onFocusOutCapture() {
+      if (suppressNextBlurRef.current) {
+        suppressNextBlurRef.current = false
+        return
+      }
+      warnAntiCheat('Pérdida de foco/cambio de aplicación detectado', 'leave')
+    }
+    function onPageHide() {
+      warnAntiCheat('Salida de la página detectada', 'pagehide')
+    }
+
+    let hadFocus = document.hasFocus()
+    const focusPollId = window.setInterval(() => {
+      const hasFocus = document.hasFocus()
+      if (hadFocus && !hasFocus) {
+        onFocusOutCapture()
+      }
+      hadFocus = hasFocus
+    }, 500)
+
     document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('blur', onBlur)
+    window.addEventListener('blur', onBlur, true)
+    window.addEventListener('focusout', onFocusOutCapture, true)
+    window.addEventListener('pagehide', onPageHide)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('blur', onBlur, true)
+      window.removeEventListener('focusout', onFocusOutCapture, true)
+      window.removeEventListener('pagehide', onPageHide)
+      window.clearInterval(focusPollId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitOk, blocked])
@@ -139,7 +218,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         return
       }
       if (hadFullscreenRef.current) {
-        warnAntiCheat('Salida de pantalla completa detectada')
+        warnAntiCheat('Salida de pantalla completa detectada', 'fullscreen')
       }
     }
     document.addEventListener('fullscreenchange', onFsChange)
@@ -147,12 +226,23 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitOk, blocked])
 
+  // auto-submit when blocked
+  useEffect(() => {
+    if (!blocked || submitOk) return
+    if (autoSubmitTriggeredRef.current) return
+    autoSubmitTriggeredRef.current = true
+    setPendingSubmit(true)
+    setAntiCheatNote('Examen bloqueado por múltiples advertencias. Enviando automáticamente…')
+    void trySubmit(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocked, submitOk])
+
   // auto-retry when pending
   useEffect(() => {
     if (!pendingSubmit || submitOk) return
     if (retryTimerRef.current != null) return
     retryTimerRef.current = window.setInterval(() => {
-      void trySubmit()
+      void trySubmit(true)
     }, 5000)
     return () => {
       if (retryTimerRef.current != null) {
@@ -185,39 +275,6 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     intento.preguntas.length > 0 &&
     (missingCount === 0 || isTimeUp)
 
-  async function trySubmit() {
-    if (submitting) return
-    setError(null)
-    setSubmitting(true)
-    const respuestas = intento.preguntas
-      .map((p) => {
-        const r = answersByPreguntaId[String(p.id)]
-        return r ? { preguntaId: p.id, respuesta: r } : null
-      })
-      .filter(Boolean) as Array<{ preguntaId: number; respuesta: RespuestaCorrecta }>
-
-    const payload: IntentoEnviarRequest = {
-      intentoId: intento.intentoId,
-      respuestas,
-    }
-
-    try {
-      const res = await apiPostJson<IntentoEnviarResponse>('/api/intentos/enviar', payload)
-      if (res.estado === 'SUBMITTED') {
-        setSubmitOk(true)
-        setPendingSubmit(false)
-        onSubmitted(intento.intentoId)
-      } else {
-        setPendingSubmit(true)
-      }
-    } catch (e: any) {
-      setPendingSubmit(true)
-      setError(e?.message ? String(e.message) : 'Error enviando respuestas')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
@@ -226,7 +283,11 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
           <div>
             Tiempo restante: <strong>{mm}:{ss}</strong>
           </div>
-          {isTimeUp ? <div><strong>Tiempo terminado</strong></div> : null}
+          {isTimeUp ? (
+            <div>
+              <strong>Tiempo terminado</strong>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -234,15 +295,16 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         Estado: <strong>{submitOk ? 'ENVIADO' : pendingSubmit ? 'PENDIENTE DE ENVÍO' : 'EN PROGRESO'}</strong>
       </div>
 
+      {submitOk ? (
+        <p style={{ marginTop: 12 }}>
+          <strong>Aviso:</strong> Este intento ya fue enviado y no se puede presentar nuevamente.
+        </p>
+      ) : null}
+
       {!submitOk ? (
         <div style={{ marginTop: 8, opacity: 0.8 }}>
           Antitrampa: <strong>{blocked ? 'BLOQUEADO' : `${antiCheatWarnings}/3`}</strong>
-          {antiCheatWarnings > 0 && !blocked ? (
-            <span>
-              {' '}
-              · Al llegar a 3 se bloquea
-            </span>
-          ) : null}
+          {antiCheatWarnings > 0 && !blocked ? <span> · Al llegar a 3 se bloquea</span> : null}
         </div>
       ) : null}
 
@@ -258,7 +320,11 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       ) : null}
 
-      {error ? <p style={{ marginTop: 12 }}><strong>Error:</strong> {error}</p> : null}
+      {error ? (
+        <p style={{ marginTop: 12 }}>
+          <strong>Error:</strong> {error}
+        </p>
+      ) : null}
 
       {antiCheatNote ? (
         <p style={{ marginTop: 12 }}>
@@ -313,15 +379,13 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-        <button disabled={!canSubmit} onClick={() => void trySubmit()}>
+        <button disabled={!canSubmit} onClick={() => void trySubmit(false)}>
           {submitting ? 'Enviando…' : pendingSubmit ? 'Pendiente…' : 'Enviar'}
         </button>
       </div>
 
       {pendingSubmit && !submitOk ? (
-        <p style={{ marginTop: 8, opacity: 0.8 }}>
-          Reintentando envío automáticamente…
-        </p>
+        <p style={{ marginTop: 8, opacity: 0.8 }}>Reintentando envío automáticamente…</p>
       ) : null}
     </div>
   )
