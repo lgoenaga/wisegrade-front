@@ -39,6 +39,19 @@
   justify-self: center;
 }
 
+.appHeaderActions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerBtn {
+  padding: 6px 10px;
+  font-size: 0.92rem;
+  line-height: 1.1;
+}
+
 .appName {
   font-size: 27px;
   font-weight: 800;

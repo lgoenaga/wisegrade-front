@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { apiGetJson, apiPostJson } from './lib/api'
 import { StartAttemptForm } from './features/exam/StartAttemptForm'
 import { ExamAttemptView } from './features/exam/ExamAttemptView'
+import { ResultsView } from './features/results/ResultsView'
 import cesdeLogo from './assets/logo-Cesde-2023.svg'
 import type {
   IntentoDetalleResponse,
@@ -35,6 +36,7 @@ function extractErrorStatus(err: unknown): number | null {
 
 function App() {
   const [attempt, setAttempt] = useState<IntentoSnapshot | null>(null)
+  const [screen, setScreen] = useState<'start' | 'results'>('start')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -179,6 +181,19 @@ function App() {
             <div className="appName">WiseGrade</div>
             <div className="appSubtitle">Examen en línea</div>
           </div>
+          <div className="appHeaderActions">
+            {!attempt ? (
+              screen === 'start' ? (
+                <button className="btnSecondary headerBtn" onClick={() => setScreen('results')}>
+                  Ver resultados
+                </button>
+              ) : (
+                <button className="btnSecondary headerBtn" onClick={() => setScreen('start')}>
+                  Volver
+                </button>
+              )
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -186,7 +201,11 @@ function App() {
         {attempt ? (
           <ExamAttemptView intento={attempt} onSubmitted={handleSubmitted} />
         ) : (
-          <StartAttemptForm onStart={handleStart} busy={busy} error={error} />
+          (screen === 'results' ? (
+            <ResultsView />
+          ) : (
+            <StartAttemptForm onStart={handleStart} busy={busy} error={error} />
+          ))
         )}
       </main>
     </div>
