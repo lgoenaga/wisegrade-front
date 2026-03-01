@@ -41,7 +41,11 @@ function calcResultsPageSize(viewportWidth: number, viewportHeight: number): 10 
   return 10
 }
 
-export function ResultsView() {
+type Props = {
+  lockedDocenteId?: number | null
+}
+
+export function ResultsView({ lockedDocenteId }: Props) {
   const [periodoId, setPeriodoId] = useState('')
   const [materiaId, setMateriaId] = useState('')
   const [momentoId, setMomentoId] = useState('')
@@ -93,6 +97,11 @@ export function ResultsView() {
     void loadCatalogs()
     return () => ac.abort()
   }, [])
+
+  useEffect(() => {
+    if (!lockedDocenteId) return
+    setDocenteResponsableId(String(lockedDocenteId))
+  }, [lockedDocenteId])
 
   useEffect(() => {
     function onResize() {
@@ -219,13 +228,13 @@ export function ResultsView() {
                 const materia = materias.find((m) => m.id === nextMateriaId)
                 const allowed = new Set((materia?.docenteIds ?? []).map((id) => Number(id)))
                 if (!allowed.size) {
-                  setDocenteResponsableId('')
+                  if (!lockedDocenteId) setDocenteResponsableId('')
                   return
                 }
 
                 const selected = toPositiveInt(docenteResponsableId)
                 if (selected && !allowed.has(selected)) {
-                  setDocenteResponsableId('')
+                  if (!lockedDocenteId) setDocenteResponsableId('')
                 }
               }}
             >
@@ -255,7 +264,7 @@ export function ResultsView() {
             <select
               value={docenteResponsableId}
               onChange={(e) => setDocenteResponsableId(e.target.value)}
-              disabled={Boolean(parsed.materiaId) && docentesForMateria.length === 0}
+              disabled={Boolean(lockedDocenteId) || (Boolean(parsed.materiaId) && docentesForMateria.length === 0)}
             >
               <option value="">
                 {parsed.materiaId && docentesForMateria.length === 0

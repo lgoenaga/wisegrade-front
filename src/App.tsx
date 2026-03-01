@@ -1,6 +1,8 @@
 import './App.css'
 import { useEffect, useState } from 'react'
 import { apiGetJson, apiPostJson } from './lib/api'
+import { LoginView } from './features/auth/LoginView'
+import type { AuthMeResponse, UserRole } from './features/auth/types'
 import { StartAttemptForm } from './features/exam/StartAttemptForm'
 import { ExamAttemptView } from './features/exam/ExamAttemptView'
 import { ResultsView } from './features/results/ResultsView'
@@ -40,7 +42,51 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
+  const [me, setMe] = useState<AuthMeResponse | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+
   useEffect(() => {
+    const ac = new AbortController()
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const res = await apiGetJson<AuthMeResponse>('/api/auth/me', ac.signal)
+        if (cancelled) return
+        setMe(res)
+      } catch (e: unknown) {
+        const status = extractErrorStatus(e)
+        // When not logged in, backend responds 401/403.
+        if (status !== 401 && status !== 403) {
+          console.warn('[WiseGrade] /api/auth/me failed:', e)
+        }
+        if (cancelled) return
+        setMe(null)
+      } finally {
+        if (!cancelled) setAuthChecked(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      ac.abort()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!me) return
+    if (me.rol === 'DOCENTE') {
+      setScreen('results')
+    } else {
+      setScreen('start')
+    }
+  }, [me])
+
+  useEffect(() => {
+    if (!me) return
+    const rol: UserRole = me.rol
+    if (rol !== 'ADMIN' && rol !== 'ESTUDIANTE') return
+
     const lastAttemptId = loadLastAttemptId()
     if (!lastAttemptId) return
 
@@ -112,7 +158,7 @@ function App() {
       cancelled = true
       ac.abort()
     }
-  }, [])
+  }, [me])
 
   async function handleStart(req: IntentoIniciarRequest, meta?: { materiaNombre?: string }) {
     setBusy(true)
@@ -172,6 +218,40 @@ function App() {
     saveLastAttemptId(attemptId)
   }
 
+  async function handleLogout() {
+    try {
+      await apiPostJson<void>('/api/auth/logout', {})
+    } catch {
+      // Ignore logout failures; clearing client state is still useful.
+    } finally {
+      setMe(null)
+      setAttempt(null)
+      clearLastAttemptId()
+      setScreen('start')
+    }
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="app">
+        <header className="appHeader">
+          <div className="appHeaderInner">
+            <img className="appLogo" src={cesdeLogo} alt="CESDE" />
+            <div className="appTitle">
+              <div className="appName">WiseGrade</div>
+              <div className="appSubtitle">Examen en línea</div>
+            </div>
+          </div>
+        </header>
+        <main className="appMain">
+          <div className="card" style={{ maxWidth: 420, margin: '0 auto' }}>
+            Cargando…
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <header className="appHeader">
@@ -182,7 +262,13 @@ function App() {
             <div className="appSubtitle">Examen en línea</div>
           </div>
           <div className="appHeaderActions">
-            {!attempt ? (
+            {me ? (
+              <button className="btnSecondary headerBtn" onClick={handleLogout}>
+                Salir
+              </button>
+            ) : null}
+
+            {me && !attempt && me.rol === 'ADMIN' ? (
               screen === 'start' ? (
                 <button className="btnSecondary headerBtn" onClick={() => setScreen('results')}>
                   Ver resultados
@@ -198,14 +284,31 @@ function App() {
       </header>
 
       <main className="appMain">
-        {attempt ? (
+        {!me ? (
+          <LoginView
+            onLoggedIn={(next) => {
+              setMe(next)
+              setAttempt(null)
+              clearLastAttemptId()
+            }}
+          />
+        ) : attempt ? (
           <ExamAttemptView intento={attempt} onSubmitted={handleSubmitted} />
+        ) : me.rol === 'DOCENTE' ? (
+          <ResultsView lockedDocenteId={me.docente?.id ?? null} />
+        ) : me.rol === 'ESTUDIANTE' ? (
+          <StartAttemptForm
+            onStart={handleStart}
+            busy={busy}
+            error={error}
+            lockedEstudiante={me.estudiante}
+          />
         ) : (
-          (screen === 'results' ? (
+          screen === 'results' ? (
             <ResultsView />
           ) : (
             <StartAttemptForm onStart={handleStart} busy={busy} error={error} />
-          ))
+          )
         )}
       </main>
     </div>

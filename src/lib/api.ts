@@ -31,6 +31,7 @@ export async function apiPostJson<TResponse>(
 ): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal,
@@ -53,6 +54,7 @@ export async function apiGetJson<TResponse>(
 ): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
+    credentials: 'include',
     headers: { Accept: 'application/json' },
     signal,
   })

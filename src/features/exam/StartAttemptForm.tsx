@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiGetJson } from '../../lib/api'
+import type { AuthPersonaResponse } from '../auth/types'
 import type { IntentoIniciarRequest } from './types'
 
 type Props = {
   onStart: (req: IntentoIniciarRequest, meta?: { materiaNombre?: string }) => void
   busy: boolean
   error?: string
+  lockedEstudiante?: AuthPersonaResponse | null
 }
 
 type Periodo = { id: number; anio: number; nombre: string }
@@ -29,7 +31,7 @@ function toPositiveInt(value: string): number | null {
   return i > 0 ? i : null
 }
 
-export function StartAttemptForm({ onStart, busy, error }: Props) {
+export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Props) {
   const [periodoId, setPeriodoId] = useState('')
   const [materiaId, setMateriaId] = useState('')
   const [momentoId, setMomentoId] = useState('')
@@ -48,6 +50,11 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([])
 
   useEffect(() => {
+    if (!lockedEstudiante?.id) return
+    setEstudianteId(String(lockedEstudiante.id))
+  }, [lockedEstudiante?.id])
+
+  useEffect(() => {
     const ac = new AbortController()
     async function loadCatalogs() {
       try {
@@ -57,7 +64,7 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
           apiGetJson<Materia[]>('/api/materias', ac.signal),
           apiGetJson<Momento[]>('/api/momentos', ac.signal),
           apiGetJson<Docente[]>('/api/docentes', ac.signal),
-          apiGetJson<Estudiante[]>('/api/estudiantes', ac.signal),
+          lockedEstudiante ? Promise.resolve([] as Estudiante[]) : apiGetJson<Estudiante[]>('/api/estudiantes', ac.signal),
         ])
         setPeriodos(Array.isArray(p) ? p : [])
         setMaterias(Array.isArray(m) ? m : [])
@@ -258,19 +265,28 @@ export function StartAttemptForm({ onStart, busy, error }: Props) {
 
           <div className="field">
             <label>Estudiante</label>
-            <input
-              value={estudianteQuery}
-              onChange={(e) => setEstudianteQuery(e.target.value)}
-              placeholder="Buscar estudiante por nombre o documento…"
-            />
-            <select value={estudianteId} onChange={(e) => setEstudianteId(e.target.value)}>
-              <option value="">Selecciona un estudiante…</option>
-              {estudiantesFiltered.map((e) => (
-                <option key={e.id} value={String(e.id)}>
-                  {e.id} — {e.nombres} {e.apellidos}
-                </option>
-              ))}
-            </select>
+            {lockedEstudiante ? (
+              <input
+                value={`${lockedEstudiante.nombres} ${lockedEstudiante.apellidos} (${lockedEstudiante.documento})`}
+                disabled
+              />
+            ) : (
+              <>
+                <input
+                  value={estudianteQuery}
+                  onChange={(e) => setEstudianteQuery(e.target.value)}
+                  placeholder="Buscar estudiante por nombre o documento…"
+                />
+                <select value={estudianteId} onChange={(e) => setEstudianteId(e.target.value)}>
+                  <option value="">Selecciona un estudiante…</option>
+                  {estudiantesFiltered.map((e) => (
+                    <option key={e.id} value={String(e.id)}>
+                      {e.id} — {e.nombres} {e.apellidos}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
 
           <div className="field">
