@@ -41,6 +41,29 @@ function calcResultsPageSize(viewportWidth: number, viewportHeight: number): 10 
   return 10
 }
 
+function escapeCsv(value: unknown): string {
+  const s = value == null ? '' : String(value)
+  if (/[\n\r",]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function downloadCsv(filename: string, rows: Array<Array<unknown>>) {
+  const lines = rows.map((r) => r.map(escapeCsv).join(','))
+  // Add BOM for Excel compatibility.
+  const csv = `\ufeff${lines.join('\n')}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 type Props = {
   lockedDocenteId?: number | null
 }
@@ -185,6 +208,8 @@ export function ResultsView({ lockedDocenteId }: Props) {
     return filas.slice(start, start + pageSize)
   }, [filas, page, pageSize])
 
+  const canExport = Boolean(data && filas.length > 0)
+
   return (
     <div className="resultsContainer">
       <div className="card stack resultsCard">
@@ -302,8 +327,39 @@ export function ResultsView({ lockedDocenteId }: Props) {
                     ID Examen: {data.examenId}
                   </div>
                 </div>
-                <div className="muted" style={{ fontSize: 13 }}>
-                  Filas: {filas.length}
+                <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    Filas: {filas.length}
+                  </div>
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    disabled={!canExport}
+                    onClick={() => {
+                      if (!data) return
+                      const rows: Array<Array<unknown>> = [
+                        ['Documento', 'Estudiante', 'Nota', 'Inicio', 'Envío', 'No Examen'],
+                        ...filas.map((f) => {
+                          const est = f.estudiante
+                          const estudianteNombre = `${est.nombres} ${est.apellidos}`
+                          const nota = typeof f.resultado?.notaSobre5 === 'number' ? f.resultado.notaSobre5.toFixed(2) : ''
+                          return [
+                            est.documento,
+                            estudianteNombre,
+                            nota,
+                            formatLocalDateTimeHM(f.startedAt),
+                            formatLocalDateTimeHM(f.submittedAt),
+                            f.intentoId,
+                          ]
+                        }),
+                      ]
+
+                      const safeMateria = (selectedMateriaNombre ?? 'examen').replace(/[^a-z0-9_-]+/gi, '_')
+                      downloadCsv(`resultados-${safeMateria}-examen-${data.examenId}.csv`, rows)
+                    }}
+                  >
+                    Exportar Excel (CSV)
+                  </button>
                 </div>
               </div>
             </div>

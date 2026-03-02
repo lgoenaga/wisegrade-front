@@ -6,6 +6,11 @@ export type ApiError = {
   raw?: unknown
 }
 
+export type ApiBlobResponse = {
+  blob: Blob
+  filename?: string
+}
+
 function extractMessage(raw: unknown, fallback: string): string {
   if (!raw || typeof raw !== 'object') return fallback
   const msg = (raw as Record<string, unknown>).message
@@ -22,6 +27,14 @@ async function readJsonSafe(response: Response): Promise<unknown> {
   } catch {
     return text
   }
+}
+
+function extractFilenameFromContentDisposition(value: string | null): string | undefined {
+  if (!value) return undefined
+  // Very small parser: supports `filename="..."`.
+  const m = /filename\s*=\s*"([^"]+)"/i.exec(value)
+  if (m?.[1]) return m[1]
+  return undefined
 }
 
 export async function apiPostJson<TResponse>(
@@ -68,4 +81,24 @@ export async function apiGetJson<TResponse>(
   }
 
   return (await readJsonSafe(response)) as TResponse
+}
+
+export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<ApiBlobResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    credentials: 'include',
+    signal,
+  })
+
+  if (!response.ok) {
+    const raw = await readJsonSafe(response)
+    const message = extractMessage(raw, `HTTP ${response.status}`)
+
+    const err: ApiError = { status: response.status, message, raw }
+    throw err
+  }
+
+  const blob = await response.blob()
+  const filename = extractFilenameFromContentDisposition(response.headers.get('content-disposition'))
+  return { blob, filename }
 }

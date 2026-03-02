@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { apiGetJson, apiPostJson } from '../../lib/api'
+import { apiGetBlob, apiGetJson, apiPostJson } from '../../lib/api'
 import { EXAM_DURATION_MINUTES, assertFinitePositive } from '../../lib/config'
 import { loadAttemptDraft, saveAttemptDraft } from './examStorage'
 import type {
@@ -69,6 +69,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const [hydrated, setHydrated] = useState(false)
   const [submittedDetail, setSubmittedDetail] = useState<IntentoDetalleResponse | null>(null)
   const [currentIdx, setCurrentIdx] = useState(0)
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const retryTimerRef = useRef<number | null>(null)
   const lastWarnAtRef = useRef<number>(0)
@@ -160,6 +161,28 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   }, [intento.estado])
 
   const isSubmitted = submitOk || intento.estado === 'SUBMITTED'
+
+  async function handleExportPdf() {
+    if (!isSubmitted) return
+    if (exportingPdf) return
+    setExportingPdf(true)
+    setError(null)
+    try {
+      const { blob, filename } = await apiGetBlob(`/api/intentos/${intento.intentoId}/export/pdf`)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename || `examen-intento-${intento.intentoId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) {
+      setError(extractErrorMessage(e, 'No se pudo exportar el PDF'))
+    } finally {
+      setExportingPdf(false)
+    }
+  }
 
   useEffect(() => {
     if (!isSubmitted) {
@@ -480,6 +503,14 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
           ) : (
             <span style={{ opacity: 0.8 }}>Calificación no disponible (aún).</span>
           )}
+        </div>
+      ) : null}
+
+      {isSubmitted ? (
+        <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="button" className="btnSecondary examBtn" onClick={() => void handleExportPdf()} disabled={exportingPdf}>
+            {exportingPdf ? 'Exportando PDF…' : 'Exportar PDF'}
+          </button>
         </div>
       ) : null}
 
