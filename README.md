@@ -7,8 +7,11 @@ Su función principal es que un estudiante pueda:
 - Iniciar un intento de examen.
 - Responder preguntas (guardando progreso local).
 - Enviar el intento al backend con tolerancia a fallos de red.
+- Exportar el intento a PDF una vez enviado.
 
 Además soporta autenticación por **sesión** (login) y UI por rol (estudiante/docente/admin).
+
+Para docentes/admin, la vista de Resultados permite exportar a **Excel (CSV)** los resultados consultados.
 
 Documentación de snapshot del estado actual: ver `../Documents/frontend-summary.md`.
 
@@ -88,6 +91,7 @@ cd ../backend
   - `POST /api/intentos/iniciar`
   - `POST /api/intentos/enviar`
   - `GET /api/intentos/{intentoId}`
+  - `GET /api/intentos/{intentoId}/export/pdf`
 
 Incluye una pantalla de **Resultados** para consultar intentos SUBMITTED por configuración:
 
