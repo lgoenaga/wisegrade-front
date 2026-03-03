@@ -168,7 +168,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     setExportingPdf(true)
     setError(null)
     try {
-      const { blob, filename } = await apiGetBlob(`/api/intentos/${intento.intentoId}/export/pdf`)
+      const { blob, filename } = await apiGetBlob(`/intentos/${intento.intentoId}/export/pdf`)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -199,7 +199,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     const controller = new AbortController()
     ;(async () => {
       try {
-        const detalle = await apiGetJson<IntentoDetalleResponse>(`/api/intentos/${intento.intentoId}`, controller.signal)
+        const detalle = await apiGetJson<IntentoDetalleResponse>(`/intentos/${intento.intentoId}`, controller.signal)
         setSubmittedDetail(detalle)
       } catch {
         // If it fails, keep showing the submitted state without correction.
@@ -259,7 +259,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     }
 
     try {
-      const res = await apiPostJson<IntentoEnviarResponse>('/api/intentos/enviar', payload)
+      const res = await apiPostJson<IntentoEnviarResponse>('/intentos/enviar', payload)
       if (res.estado === 'SUBMITTED') {
         setSubmitOk(true)
         setPendingSubmit(false)

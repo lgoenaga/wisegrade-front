@@ -32,7 +32,7 @@ export function LoginView({ onLoggedIn }: Props) {
 
     try {
       const payload: AuthLoginRequest = { documento: documento.trim(), clave }
-      const me = await apiPostJson<AuthMeResponse>('/api/auth/login', payload)
+      const me = await apiPostJson<AuthMeResponse>('/auth/login', payload)
       onLoggedIn(me)
     } catch (e: unknown) {
       setError(extractErrorMessage(e, 'No se pudo iniciar sesión'))

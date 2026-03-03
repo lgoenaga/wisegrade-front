@@ -101,10 +101,10 @@ export function ResultsView({ lockedDocenteId }: Props) {
       try {
         setCatalogError(null)
         const [p, m, mo, d] = await Promise.all([
-          apiGetJson<Periodo[]>('/api/periodos', ac.signal),
-          apiGetJson<Materia[]>('/api/materias', ac.signal),
-          apiGetJson<Momento[]>('/api/momentos', ac.signal),
-          apiGetJson<Docente[]>('/api/docentes', ac.signal),
+          apiGetJson<Periodo[]>('/periodos', ac.signal),
+          apiGetJson<Materia[]>('/materias', ac.signal),
+          apiGetJson<Momento[]>('/momentos', ac.signal),
+          apiGetJson<Docente[]>('/docentes', ac.signal),
         ])
         setPeriodos(Array.isArray(p) ? p : [])
         setMaterias(Array.isArray(m) ? m : [])
@@ -180,7 +180,7 @@ export function ResultsView({ lockedDocenteId }: Props) {
         docenteResponsableId: String(parsed.docenteResponsableId),
       })
 
-      const res = await apiGetJson<ExamenResultadosResponse>(`/api/examenes/resultados?${qs.toString()}`)
+      const res = await apiGetJson<ExamenResultadosResponse>(`/examenes/resultados?${qs.toString()}`)
       setData(res)
       setPage(1)
     } catch (e: unknown) {

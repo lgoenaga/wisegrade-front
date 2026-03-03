@@ -60,11 +60,11 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
       try {
         setCatalogError(null)
         const [p, m, mo, d, e] = await Promise.all([
-          apiGetJson<Periodo[]>('/api/periodos', ac.signal),
-          apiGetJson<Materia[]>('/api/materias', ac.signal),
-          apiGetJson<Momento[]>('/api/momentos', ac.signal),
-          apiGetJson<Docente[]>('/api/docentes', ac.signal),
-          lockedEstudiante ? Promise.resolve([] as Estudiante[]) : apiGetJson<Estudiante[]>('/api/estudiantes', ac.signal),
+          apiGetJson<Periodo[]>('/periodos', ac.signal),
+          apiGetJson<Materia[]>('/materias', ac.signal),
+          apiGetJson<Momento[]>('/momentos', ac.signal),
+          apiGetJson<Docente[]>('/docentes', ac.signal),
+          lockedEstudiante ? Promise.resolve([] as Estudiante[]) : apiGetJson<Estudiante[]>('/estudiantes', ac.signal),
         ])
         setPeriodos(Array.isArray(p) ? p : [])
         setMaterias(Array.isArray(m) ? m : [])

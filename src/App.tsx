@@ -51,14 +51,21 @@ function App() {
 
     ;(async () => {
       try {
-        const res = await apiGetJson<AuthMeResponse>('/api/auth/me', ac.signal)
+        const res = await apiGetJson<AuthMeResponse>('/auth/me', ac.signal)
         if (cancelled) return
         setMe(res)
       } catch (e: unknown) {
+        // In dev (React StrictMode), effects can be started/stopped quickly.
+        // AbortError is expected when cleanup runs.
+        if (e && typeof e === 'object' && (e as { name?: unknown }).name === 'AbortError') {
+          if (cancelled) return
+          setMe(null)
+          return
+        }
         const status = extractErrorStatus(e)
         // When not logged in, backend responds 401/403.
         if (status !== 401 && status !== 403) {
-          console.warn('[WiseGrade] /api/auth/me failed:', e)
+          console.warn('[WiseGrade] /auth/me failed:', e)
         }
         if (cancelled) return
         setMe(null)
@@ -96,7 +103,7 @@ function App() {
     ;(async () => {
       try {
         const serverAttempt = await apiGetJson<IntentoDetalleResponse>(
-          `/api/intentos/${lastAttemptId}`,
+          `/intentos/${lastAttemptId}`,
           ac.signal,
         )
         if (cancelled) return
@@ -164,9 +171,9 @@ function App() {
     setBusy(true)
     setError(undefined)
     try {
-      const res = await apiPostJson<IntentoIniciarResponse>('/api/intentos/iniciar', req)
+      const res = await apiPostJson<IntentoIniciarResponse>('/intentos/iniciar', req)
       if (res.estado === 'SUBMITTED') {
-        const serverAttempt = await apiGetJson<IntentoDetalleResponse>(`/api/intentos/${res.intentoId}`)
+        const serverAttempt = await apiGetJson<IntentoDetalleResponse>(`/intentos/${res.intentoId}`)
         setAttempt(serverAttempt)
 
         const answersByPreguntaId: Record<string, RespuestaCorrecta> = {}
@@ -220,7 +227,7 @@ function App() {
 
   async function handleLogout() {
     try {
-      await apiPostJson<void>('/api/auth/logout', {})
+      await apiPostJson<void>('/auth/logout', {})
     } catch {
       // Ignore logout failures; clearing client state is still useful.
     } finally {
