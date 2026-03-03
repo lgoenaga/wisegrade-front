@@ -72,6 +72,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const [exportingPdf, setExportingPdf] = useState(false)
 
   const retryTimerRef = useRef<number | null>(null)
+  const persistTimerRef = useRef<number | null>(null)
   const lastWarnAtRef = useRef<number>(0)
   const lastWarnKeyRef = useRef<string>('')
   const hadFullscreenRef = useRef<boolean>(false)
@@ -230,13 +231,29 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   // persist answers & pending flag
   useEffect(() => {
     if (!hydrated) return
-    saveAttemptDraft({
-      intentoSnapshot: submitOk ? { ...intento, estado: 'SUBMITTED' } : intento,
-      answersByPreguntaId,
-      pendingSubmit,
-      antiCheatWarnings,
-      blocked,
-    })
+    if (persistTimerRef.current != null) {
+      window.clearTimeout(persistTimerRef.current)
+      persistTimerRef.current = null
+    }
+
+    // Debounce to avoid frequent synchronous localStorage writes while answering.
+    persistTimerRef.current = window.setTimeout(() => {
+      saveAttemptDraft({
+        intentoSnapshot: submitOk ? { ...intento, estado: 'SUBMITTED' } : intento,
+        answersByPreguntaId,
+        pendingSubmit,
+        antiCheatWarnings,
+        blocked,
+      })
+      persistTimerRef.current = null
+    }, 250)
+
+    return () => {
+      if (persistTimerRef.current != null) {
+        window.clearTimeout(persistTimerRef.current)
+        persistTimerRef.current = null
+      }
+    }
   }, [answersByPreguntaId, pendingSubmit, antiCheatWarnings, blocked, intento, submitOk, hydrated])
 
   async function trySubmit(force: boolean = false) {
