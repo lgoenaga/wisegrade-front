@@ -102,3 +102,20 @@ export async function apiGetBlob(path: string, signal?: AbortSignal): Promise<Ap
   const filename = extractFilenameFromContentDisposition(response.headers.get('content-disposition'))
   return { blob, filename }
 }
+
+export async function apiDelete(path: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+    signal,
+  })
+
+  if (!response.ok) {
+    const raw = await readJsonSafe(response)
+    const message = extractMessage(raw, `HTTP ${response.status}`)
+
+    const err: ApiError = { status: response.status, message, raw }
+    throw err
+  }
+}
