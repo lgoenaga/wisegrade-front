@@ -83,10 +83,23 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
   const [data, setData] = useState<ExamenResultadosResponse | null>(null)
 
   const [deletingIntentoId, setDeletingIntentoId] = useState<number | null>(null)
+
+  const [confirmDelete, setConfirmDelete] = useState<{
+    intentoId: number
+    estado: string
+    estudianteNombre: string
+    documento: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const t = window.setTimeout(() => setToast(null), 5000)
+    return () => window.clearTimeout(t)
+  }, [toast])
 
   const [viewport, setViewport] = useState(() => {
     if (typeof window === 'undefined') return { w: 1024, h: 768 }
@@ -175,7 +188,6 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
     setBusy(true)
     setError(null)
-    setNotice(null)
 
     try {
       const qs = new URLSearchParams({
@@ -206,21 +218,36 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     const { intentoId, estado, estudianteNombre, documento } = params
     if (!intentoId || busy || deletingIntentoId != null) return
 
-    const ok = window.confirm(
-      `¿Eliminar el intento ${intentoId} (${estado}) del estudiante ${estudianteNombre} (${documento})?\n\nEsta acción eliminará también las preguntas del intento y no se puede deshacer.`,
-    )
-    if (!ok) return
+    setConfirmDelete({ intentoId, estado, estudianteNombre, documento })
+  }
+
+  async function confirmDeleteIntento() {
+    const params = confirmDelete
+    if (!params) return
+    const { intentoId } = params
+    if (!intentoId || busy || deletingIntentoId != null) return
 
     setDeletingIntentoId(intentoId)
     setError(null)
-    setNotice(null)
+    setToast(null)
+    setConfirmDelete(null)
+
     try {
       await apiDelete(`/intentos/${intentoId}`)
+
+      // Optimistic UI: remove the row immediately even if refresh cannot run.
+      setData((prev) => {
+        if (!prev) return prev
+        return { ...prev, filas: (prev.filas ?? []).filter((f) => f.intentoId !== intentoId) }
+      })
+
+      // Best-effort refresh (keeps server as source of truth), but don't depend on it for feedback.
       await handleQuery()
-      setNotice({ kind: 'success', message: `Intento ${intentoId} eliminado con éxito.` })
+
+      setToast({ kind: 'success', message: `Intento ${intentoId} eliminado con éxito.` })
     } catch (e: unknown) {
       const msg = extractErrorMessage(e, 'No se pudo eliminar el intento')
-      setNotice({ kind: 'error', message: `La eliminación falló: ${msg}` })
+      setToast({ kind: 'error', message: `La eliminación falló: ${msg}` })
     } finally {
       setDeletingIntentoId(null)
     }
@@ -343,12 +370,6 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
         {error ? (
           <p style={{ margin: 0 }}>
             <strong>Error:</strong> {error}
-          </p>
-        ) : null}
-
-        {notice ? (
-          <p style={{ margin: 0 }}>
-            <strong>{notice.kind === 'success' ? 'Éxito:' : 'Error:'}</strong> {notice.message}
           </p>
         ) : null}
 
@@ -535,6 +556,85 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
           </div>
         ) : null}
       </div>
+
+      {toast ? (
+        <div
+          style={{
+            position: 'fixed',
+            right: 16,
+            bottom: 16,
+            zIndex: 1000,
+            width: 'min(520px, calc(100vw - 32px))',
+          }}
+          aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
+        >
+          <div className="card" style={{ padding: 10 }}>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 2 }}>
+                  {toast.kind === 'success' ? 'Éxito' : 'Error'}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--wg-text)' }}>{toast.message}</div>
+              </div>
+              <button
+                type="button"
+                className="btnSecondary headerBtn"
+                onClick={() => setToast(null)}
+                disabled={deletingIntentoId != null}
+                title="Cerrar"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmDelete ? (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} role="dialog" aria-modal="true">
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--wg-bg)', opacity: 0.85 }} />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'grid',
+              placeItems: 'center',
+              padding: 16,
+            }}
+          >
+            <div className="card" style={{ width: 'min(560px, 100%)', padding: 12 }}>
+              <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Confirmar eliminación</div>
+              <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+                Esta acción elimina también las preguntas del intento y no se puede deshacer.
+              </div>
+
+              <div style={{ fontSize: 13, marginBottom: 10 }}>
+                ¿Eliminar el intento <strong>{confirmDelete.intentoId}</strong> ({confirmDelete.estado}) del estudiante{' '}
+                <strong>{confirmDelete.estudianteNombre}</strong> ({confirmDelete.documento})?
+              </div>
+
+              <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btnSecondary"
+                  onClick={() => setConfirmDelete(null)}
+                  disabled={deletingIntentoId != null || busy}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteIntento}
+                  disabled={deletingIntentoId != null || busy}
+                  title="Eliminar intento"
+                >
+                  {deletingIntentoId != null ? 'Eliminando…' : 'Eliminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
