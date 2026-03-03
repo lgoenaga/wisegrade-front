@@ -11,12 +11,15 @@ export type ResultadoIntentoResponse = {
   notaSobre5: number
 }
 
+export type IntentoEstado = 'IN_PROGRESS' | 'SUBMITTED'
+
 export type ExamenResultadoFilaResponse = {
   intentoId: number
+  estado: IntentoEstado
   estudiante: EstudianteResumenResponse
   startedAt: string
-  submittedAt: string
-  resultado: ResultadoIntentoResponse
+  submittedAt: string | null
+  resultado: ResultadoIntentoResponse | null
 }
 
 export type ExamenResultadosResponse = {

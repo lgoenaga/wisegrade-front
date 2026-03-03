@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { apiGetJson } from '../../lib/api'
+import { apiDelete, apiGetJson } from '../../lib/api'
 import type { ExamenResultadosResponse } from './types'
 
 type Periodo = { id: number; anio: number; nombre: string }
@@ -66,9 +66,10 @@ function downloadCsv(filename: string, rows: Array<Array<unknown>>) {
 
 type Props = {
   lockedDocenteId?: number | null
+  rol?: 'ADMIN' | 'DOCENTE'
 }
 
-export function ResultsView({ lockedDocenteId }: Props) {
+export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [periodoId, setPeriodoId] = useState('')
   const [materiaId, setMateriaId] = useState('')
   const [momentoId, setMomentoId] = useState('')
@@ -83,6 +84,8 @@ export function ResultsView({ lockedDocenteId }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ExamenResultadosResponse | null>(null)
+
+  const [deletingIntentoId, setDeletingIntentoId] = useState<number | null>(null)
 
   const [viewport, setViewport] = useState(() => {
     if (typeof window === 'undefined') return { w: 1024, h: 768 }
@@ -178,6 +181,7 @@ export function ResultsView({ lockedDocenteId }: Props) {
         materiaId: String(parsed.materiaId),
         momentoId: String(parsed.momentoId),
         docenteResponsableId: String(parsed.docenteResponsableId),
+        includeInProgress: 'true',
       })
 
       const res = await apiGetJson<ExamenResultadosResponse>(`/examenes/resultados?${qs.toString()}`)
@@ -188,6 +192,21 @@ export function ResultsView({ lockedDocenteId }: Props) {
       setData(null)
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleDeleteIntento(intentoId: number) {
+    if (!intentoId || busy || deletingIntentoId != null) return
+
+    setDeletingIntentoId(intentoId)
+    setError(null)
+    try {
+      await apiDelete(`/intentos/${intentoId}`)
+      await handleQuery()
+    } catch (e: unknown) {
+      setError(extractErrorMessage(e, 'No se pudo eliminar el intento'))
+    } finally {
+      setDeletingIntentoId(null)
     }
   }
 
@@ -216,7 +235,7 @@ export function ResultsView({ lockedDocenteId }: Props) {
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>Resultados</h2>
           <p className="muted" style={{ marginTop: 3, marginBottom: 0, fontSize: 13 }}>
-            Consulta los intentos enviados (SUBMITTED) para una configuración.
+            Consulta los intentos para una configuración.
           </p>
         </div>
 
@@ -338,7 +357,7 @@ export function ResultsView({ lockedDocenteId }: Props) {
                     onClick={() => {
                       if (!data) return
                       const rows: Array<Array<unknown>> = [
-                        ['Documento', 'Estudiante', 'Nota', 'Inicio', 'Envío', 'No Examen'],
+                        ['Documento', 'Estudiante', 'Estado', 'Nota', 'Inicio', 'Envío', 'No Examen'],
                         ...filas.map((f) => {
                           const est = f.estudiante
                           const estudianteNombre = `${est.nombres} ${est.apellidos}`
@@ -346,6 +365,7 @@ export function ResultsView({ lockedDocenteId }: Props) {
                           return [
                             est.documento,
                             estudianteNombre,
+                            f.estado,
                             nota,
                             formatLocalDateTimeHM(f.startedAt),
                             formatLocalDateTimeHM(f.submittedAt),
@@ -394,20 +414,24 @@ export function ResultsView({ lockedDocenteId }: Props) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                 <colgroup>
                   <col style={{ width: '14%' }} />
-                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '26%' }} />
                   <col style={{ width: '10%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '8%' }} />
                   <col style={{ width: '10%' }} />
                 </colgroup>
                 <thead>
                   <tr style={{ textAlign: 'left' }}>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Documento</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estudiante</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estado</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Nota</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Inicio</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Envío</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>No Examen</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -415,6 +439,11 @@ export function ResultsView({ lockedDocenteId }: Props) {
                     const est = f.estudiante
                     const estudianteNombre = `${est.nombres} ${est.apellidos}`
                     const nota = typeof f.resultado?.notaSobre5 === 'number' ? f.resultado.notaSobre5.toFixed(2) : ''
+
+                    const canDelete =
+                      (rol === 'ADMIN') ||
+                      (rol === 'DOCENTE' && f.estado !== 'SUBMITTED')
+                    const isDeleting = deletingIntentoId === f.intentoId
                     return (
                       <tr key={f.intentoId}>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
@@ -432,6 +461,9 @@ export function ResultsView({ lockedDocenteId }: Props) {
                             {estudianteNombre}
                           </div>
                         </td>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
+                          {f.estado}
+                        </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', fontWeight: 800, whiteSpace: 'nowrap' }}>
                           {nota}
                         </td>
@@ -444,6 +476,21 @@ export function ResultsView({ lockedDocenteId }: Props) {
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
                           {f.intentoId}
                         </td>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              className="btnSecondary headerBtn"
+                              disabled={busy || deletingIntentoId != null}
+                              onClick={() => handleDeleteIntento(f.intentoId)}
+                              title={f.estado === 'SUBMITTED' ? 'Solo ADMIN puede eliminar SUBMITTED' : 'Eliminar intento'}
+                            >
+                              {isDeleting ? 'Eliminando…' : 'Eliminar'}
+                            </button>
+                          ) : (
+                            ''
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -452,7 +499,7 @@ export function ResultsView({ lockedDocenteId }: Props) {
 
               {filas.length === 0 ? (
                 <p className="muted" style={{ margin: '8px 0 0', fontSize: 13 }}>
-                  No hay intentos enviados para esta configuración.
+                  No hay intentos para esta configuración.
                 </p>
               ) : null}
             </div>

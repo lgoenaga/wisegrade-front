@@ -302,7 +302,7 @@ function App() {
         ) : attempt ? (
           <ExamAttemptView intento={attempt} onSubmitted={handleSubmitted} />
         ) : me.rol === 'DOCENTE' ? (
-          <ResultsView lockedDocenteId={me.docente?.id ?? null} />
+          <ResultsView lockedDocenteId={me.docente?.id ?? null} rol="DOCENTE" />
         ) : me.rol === 'ESTUDIANTE' ? (
           <StartAttemptForm
             onStart={handleStart}
@@ -312,7 +312,7 @@ function App() {
           />
         ) : (
           screen === 'results' ? (
-            <ResultsView />
+            <ResultsView rol="ADMIN" />
           ) : (
             <StartAttemptForm onStart={handleStart} busy={busy} error={error} />
           )
