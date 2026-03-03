@@ -83,6 +83,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
   const [data, setData] = useState<ExamenResultadosResponse | null>(null)
 
   const [deletingIntentoId, setDeletingIntentoId] = useState<number | null>(null)
@@ -174,6 +175,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
     setBusy(true)
     setError(null)
+    setNotice(null)
 
     try {
       const qs = new URLSearchParams({
@@ -195,16 +197,30 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     }
   }
 
-  async function handleDeleteIntento(intentoId: number) {
+  async function handleDeleteIntento(params: {
+    intentoId: number
+    estado: string
+    estudianteNombre: string
+    documento: string
+  }) {
+    const { intentoId, estado, estudianteNombre, documento } = params
     if (!intentoId || busy || deletingIntentoId != null) return
+
+    const ok = window.confirm(
+      `¿Eliminar el intento ${intentoId} (${estado}) del estudiante ${estudianteNombre} (${documento})?\n\nEsta acción eliminará también las preguntas del intento y no se puede deshacer.`,
+    )
+    if (!ok) return
 
     setDeletingIntentoId(intentoId)
     setError(null)
+    setNotice(null)
     try {
       await apiDelete(`/intentos/${intentoId}`)
       await handleQuery()
+      setNotice({ kind: 'success', message: `Intento ${intentoId} eliminado con éxito.` })
     } catch (e: unknown) {
-      setError(extractErrorMessage(e, 'No se pudo eliminar el intento'))
+      const msg = extractErrorMessage(e, 'No se pudo eliminar el intento')
+      setNotice({ kind: 'error', message: `La eliminación falló: ${msg}` })
     } finally {
       setDeletingIntentoId(null)
     }
@@ -327,6 +343,12 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
         {error ? (
           <p style={{ margin: 0 }}>
             <strong>Error:</strong> {error}
+          </p>
+        ) : null}
+
+        {notice ? (
+          <p style={{ margin: 0 }}>
+            <strong>{notice.kind === 'success' ? 'Éxito:' : 'Error:'}</strong> {notice.message}
           </p>
         ) : null}
 
@@ -482,7 +504,14 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                               type="button"
                               className="btnSecondary headerBtn"
                               disabled={busy || deletingIntentoId != null}
-                              onClick={() => handleDeleteIntento(f.intentoId)}
+                              onClick={() =>
+                                handleDeleteIntento({
+                                  intentoId: f.intentoId,
+                                  estado: f.estado,
+                                  estudianteNombre,
+                                  documento: est.documento,
+                                })
+                              }
                               title={f.estado === 'SUBMITTED' ? 'Solo ADMIN puede eliminar SUBMITTED' : 'Eliminar intento'}
                             >
                               {isDeleting ? 'Eliminando…' : 'Eliminar'}
