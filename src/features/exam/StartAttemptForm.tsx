@@ -36,7 +36,7 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
   const [materiaId, setMateriaId] = useState('')
   const [momentoId, setMomentoId] = useState('')
   const [docenteResponsableId, setDocenteResponsableId] = useState('')
-  const [estudianteId, setEstudianteId] = useState('')
+  const [estudianteIdInput, setEstudianteIdInput] = useState('')
   const [cantidad, setCantidad] = useState('10')
 
   const [docenteQuery, setDocenteQuery] = useState('')
@@ -49,22 +49,20 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
   const [docentes, setDocentes] = useState<Docente[]>([])
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([])
 
-  useEffect(() => {
-    if (!lockedEstudiante?.id) return
-    setEstudianteId(String(lockedEstudiante.id))
-  }, [lockedEstudiante?.id])
+  const effectiveEstudianteId = lockedEstudiante?.id ? String(lockedEstudiante.id) : estudianteIdInput
 
   useEffect(() => {
     const ac = new AbortController()
     async function loadCatalogs() {
       try {
         setCatalogError(null)
+        const lockedId = lockedEstudiante?.id
         const [p, m, mo, d, e] = await Promise.all([
           apiGetJson<Periodo[]>('/periodos', ac.signal),
           apiGetJson<Materia[]>('/materias', ac.signal),
           apiGetJson<Momento[]>('/momentos', ac.signal),
           apiGetJson<Docente[]>('/docentes', ac.signal),
-          lockedEstudiante ? Promise.resolve([] as Estudiante[]) : apiGetJson<Estudiante[]>('/estudiantes', ac.signal),
+          lockedId ? Promise.resolve([] as Estudiante[]) : apiGetJson<Estudiante[]>('/estudiantes', ac.signal),
         ])
         setPeriodos(Array.isArray(p) ? p : [])
         setMaterias(Array.isArray(m) ? m : [])
@@ -80,7 +78,7 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
     }
     void loadCatalogs()
     return () => ac.abort()
-  }, [])
+  }, [lockedEstudiante?.id])
 
   const parsed = useMemo(() => {
     return {
@@ -88,10 +86,10 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
       materiaId: toPositiveInt(materiaId),
       momentoId: toPositiveInt(momentoId),
       docenteResponsableId: toPositiveInt(docenteResponsableId),
-      estudianteId: toPositiveInt(estudianteId),
+      estudianteId: toPositiveInt(effectiveEstudianteId),
       cantidad: toPositiveInt(cantidad),
     }
-  }, [periodoId, materiaId, momentoId, docenteResponsableId, estudianteId, cantidad])
+  }, [periodoId, materiaId, momentoId, docenteResponsableId, effectiveEstudianteId, cantidad])
 
   const docentesForMateria = useMemo(() => {
     if (!parsed.materiaId) return docentes
@@ -277,7 +275,7 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
                   onChange={(e) => setEstudianteQuery(e.target.value)}
                   placeholder="Buscar estudiante por nombre o documento…"
                 />
-                <select value={estudianteId} onChange={(e) => setEstudianteId(e.target.value)}>
+                <select value={estudianteIdInput} onChange={(e) => setEstudianteIdInput(e.target.value)}>
                   <option value="">Selecciona un estudiante…</option>
                   {estudiantesFiltered.map((e) => (
                     <option key={e.id} value={String(e.id)}>
