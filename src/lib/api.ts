@@ -119,3 +119,20 @@ export async function apiDelete(path: string, signal?: AbortSignal): Promise<voi
     throw err
   }
 }
+
+export async function apiPut(path: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+    signal,
+  })
+
+  if (!response.ok) {
+    const raw = await readJsonSafe(response)
+    const message = extractMessage(raw, `HTTP ${response.status}`)
+
+    const err: ApiError = { status: response.status, message, raw }
+    throw err
+  }
+}

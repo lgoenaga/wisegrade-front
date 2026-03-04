@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { apiDelete, apiGetJson, apiPostJson } from '../../lib/api'
+import { apiDelete, apiGetJson, apiPostJson, apiPut } from '../../lib/api'
 import type { ExamenResultadosResponse } from './types'
 
 type Periodo = { id: number; anio: number; nombre: string }
@@ -190,6 +190,10 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [momentos, setMomentos] = useState<Momento[]>([])
   const [docentes, setDocentes] = useState<Docente[]>([])
 
+  const [associateDocenteId, setAssociateDocenteId] = useState('')
+  const [associating, setAssociating] = useState(false)
+  const [associateError, setAssociateError] = useState<string | null>(null)
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
@@ -284,6 +288,11 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     return activos.length ? activos : base
   }, [docentes, docentesForMateria, parsed.materiaId])
 
+  const allDocentesActivos = useMemo(() => {
+    const activos = docentes.filter((d) => Boolean(d?.activo))
+    return activos.length ? activos : docentes
+  }, [docentes])
+
   const canQuery =
     !busy && parsed.periodoId && parsed.materiaId && parsed.momentoId && parsed.docenteResponsableId
 
@@ -304,9 +313,12 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     if (!parsed.periodoId) return 'Selecciona un periodo para poder crear el examen.'
     if (!parsed.materiaId) return 'Selecciona una materia para poder crear el examen.'
     if (!parsed.momentoId) return 'Selecciona un momento para poder crear el examen.'
+    if (rol === 'ADMIN' && parsed.materiaId && docentesForMateria.length === 0) {
+      return 'La materia no tiene docentes asociados. Asocia un docente a la materia para poder crear el examen.'
+    }
     if (!parsed.docenteResponsableId) return 'Selecciona un docente responsable para poder crear el examen.'
     return null
-  }, [busy, ensuring, parsed.docenteResponsableId, parsed.materiaId, parsed.momentoId, parsed.periodoId, uploadBusy])
+  }, [busy, docentesForMateria.length, ensuring, parsed.docenteResponsableId, parsed.materiaId, parsed.momentoId, parsed.periodoId, rol, uploadBusy])
 
   const canEnsure = ensureDisabledReason == null
 
@@ -379,6 +391,39 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
       setToast({ kind: 'error', message: `Crear examen falló: ${msg}` })
     } finally {
       setEnsuring(false)
+    }
+  }
+
+  async function handleAssociateDocenteToMateria() {
+    if (busy || uploadBusy || ensuring || associating) return
+    if (rol !== 'ADMIN') return
+    if (!parsed.materiaId) return
+
+    const docenteId = toPositiveInt(associateDocenteId)
+    if (!docenteId) {
+      setAssociateError('Selecciona un docente para asociar a la materia.')
+      return
+    }
+
+    setAssociating(true)
+    setAssociateError(null)
+    setToast(null)
+
+    try {
+      await apiPut(`/materias/${parsed.materiaId}/docentes/${docenteId}`)
+
+      // Refresh materias so docenteIds are updated.
+      const refreshedMaterias = await apiGetJson<Materia[]>('/materias')
+      setMaterias(Array.isArray(refreshedMaterias) ? refreshedMaterias : [])
+
+      setDocenteResponsableId(String(docenteId))
+      setToast({ kind: 'success', message: 'Docente asociado a la materia. Ya puedes crear el examen.' })
+    } catch (e: unknown) {
+      const msg = extractErrorMessage(e, 'No se pudo asociar el docente a la materia')
+      setAssociateError(msg)
+      setToast({ kind: 'error', message: `Asociación falló: ${msg}` })
+    } finally {
+      setAssociating(false)
     }
   }
 
@@ -563,7 +608,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             >
               <option value="">
                 {parsed.materiaId && docentesForMateria.length === 0
-                  ? 'No hay docentes asociados a esta materia'
+                  ? 'La materia no tiene docentes asociados'
                   : 'Selecciona un docente…'}
               </option>
               {docentesActivos.map((d) => (
@@ -572,6 +617,41 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                 </option>
               ))}
             </select>
+
+            {rol === 'ADMIN' && parsed.materiaId && docentesForMateria.length === 0 ? (
+              <div style={{ marginTop: 8 }}>
+                <div className="muted" style={{ fontSize: 12 }}>
+                  La materia no tiene docentes asociados. Asocia un docente a la materia para poder crear el examen.
+                </div>
+                <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                  <select
+                    value={associateDocenteId}
+                    onChange={(e) => setAssociateDocenteId(e.target.value)}
+                    disabled={associating || busy || uploadBusy || ensuring}
+                  >
+                    <option value="">Selecciona un docente para asociar…</option>
+                    {allDocentesActivos.map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.id} — {d.nombres} {d.apellidos}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    disabled={associating || !toPositiveInt(associateDocenteId)}
+                    onClick={handleAssociateDocenteToMateria}
+                  >
+                    {associating ? 'Asociando…' : 'Asociar'}
+                  </button>
+                </div>
+                {associateError ? (
+                  <div style={{ marginTop: 6 }}>
+                    <strong>Asociar docente:</strong> {associateError}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
 
