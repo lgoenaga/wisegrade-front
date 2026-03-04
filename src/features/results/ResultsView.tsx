@@ -41,6 +41,13 @@ type ExamenEnsureResponse = {
   totalBanco: number
 }
 
+type EstudianteCreateRequest = {
+  nombres: string
+  apellidos: string
+  documento: string
+  activo: boolean
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -100,6 +107,55 @@ function parsePreguntasJson(raw: unknown): PreguntaCreateRequest[] {
       explicacion,
     }
   })
+}
+
+function normalizeNonEmptyStr(value: unknown, field: string, index: number): string {
+  const s = String(value ?? '').trim()
+  if (!s) throw new Error(`Estudiante #${index + 1}: falta campo ${field}`)
+  return s
+}
+
+function toBooleanActivo(value: unknown): boolean {
+  if (value == null) return true
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  const s = String(value).trim().toLowerCase()
+  if (s === '1' || s === 'true' || s === 'si' || s === 'sí') return true
+  if (s === '0' || s === 'false' || s === 'no') return false
+  return true
+}
+
+function parseEstudiantesJson(raw: unknown): EstudianteCreateRequest[] {
+  const items: unknown[] = Array.isArray(raw)
+    ? raw
+    : isRecord(raw) && Array.isArray(raw.estudiantes)
+      ? (raw.estudiantes as unknown[])
+      : []
+
+  if (!items.length) {
+    throw new Error('El JSON debe ser un arreglo de estudiantes o un objeto con propiedad estudiantes[].')
+  }
+
+  const seenDocumentos = new Set<string>()
+  const out: EstudianteCreateRequest[] = []
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!isRecord(item)) throw new Error(`Estudiante #${i + 1}: objeto inválido`)
+
+    const nombres = normalizeNonEmptyStr(item.nombres, 'nombres', i)
+    const apellidos = normalizeNonEmptyStr(item.apellidos, 'apellidos', i)
+    const documento = normalizeNonEmptyStr(item.documento, 'documento', i)
+    const activo = toBooleanActivo(item.activo)
+
+    if (seenDocumentos.has(documento)) {
+      continue
+    }
+    seenDocumentos.add(documento)
+    out.push({ nombres, apellidos, documento, activo })
+  }
+
+  return out
 }
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -183,6 +239,10 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const [studentsFile, setStudentsFile] = useState<File | null>(null)
+  const [studentsBusy, setStudentsBusy] = useState(false)
+  const [studentsError, setStudentsError] = useState<string | null>(null)
 
   const [ensuring, setEnsuring] = useState(false)
   const [ensureError, setEnsureError] = useState<string | null>(null)
@@ -471,6 +531,69 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     }
   }
 
+  async function handleUploadStudents() {
+    if (rol !== 'ADMIN') return
+    if (!studentsFile) {
+      setStudentsError('Selecciona un archivo JSON de estudiantes.')
+      return
+    }
+    if (studentsBusy || busy || uploadBusy || ensuring || associating) return
+
+    setStudentsBusy(true)
+    setStudentsError(null)
+    setToast(null)
+
+    try {
+      const text = await studentsFile.text()
+      const raw = JSON.parse(text) as unknown
+      const estudiantes = parseEstudiantesJson(raw)
+
+      const existentes = await apiGetJson<Array<{ documento?: string | null }>>('/estudiantes')
+      const documentosExistentes = new Set(
+        (Array.isArray(existentes) ? existentes : [])
+          .map((e) => String(e?.documento ?? '').trim())
+          .filter((d) => d),
+      )
+
+      let received = estudiantes.length
+      let added = 0
+      let skipped = 0
+      let errors = 0
+
+      for (const e of estudiantes) {
+        if (documentosExistentes.has(e.documento)) {
+          skipped++
+          continue
+        }
+
+        try {
+          await apiPostJson('/estudiantes', e)
+          added++
+          documentosExistentes.add(e.documento)
+        } catch (err: unknown) {
+          const status = extractErrorStatus(err)
+          if (status === 409) {
+            skipped++
+            documentosExistentes.add(e.documento)
+            continue
+          }
+          errors++
+        }
+      }
+
+      setToast({
+        kind: errors ? 'error' : 'success',
+        message: `Carga estudiantes: recibidos ${received}, agregados ${added}, omitidos ${skipped}, errores ${errors}.`,
+      })
+    } catch (e: unknown) {
+      const msg = extractErrorMessage(e, 'No se pudo cargar el archivo de estudiantes')
+      setStudentsError(msg)
+      setToast({ kind: 'error', message: `Carga estudiantes falló: ${msg}` })
+    } finally {
+      setStudentsBusy(false)
+    }
+  }
+
   async function handleDeleteIntento(params: {
     intentoId: number
     estado: string
@@ -746,6 +869,43 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             </div>
           ) : null}
         </div>
+
+        {rol === 'ADMIN' ? (
+          <div className="card" style={{ padding: 10 }}>
+            <div style={{ fontWeight: 800 }}>Cargar estudiantes (JSON)</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+              Carga masiva de estudiantes. Omite duplicados por documento.
+            </div>
+
+            <div className="row" style={{ justifyContent: 'space-between', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+              <input
+                type="file"
+                accept="application/json"
+                disabled={studentsBusy || busy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null
+                  setStudentsFile(f)
+                  setStudentsError(null)
+                  setToast(null)
+                }}
+              />
+              <button
+                type="button"
+                className="btnSecondary headerBtn"
+                disabled={!studentsFile || studentsBusy || busy}
+                onClick={handleUploadStudents}
+              >
+                {studentsBusy ? 'Cargando…' : 'Cargar estudiantes'}
+              </button>
+            </div>
+
+            {studentsError ? (
+              <p style={{ margin: 0, marginTop: 8 }}>
+                <strong>Carga estudiantes:</strong> {studentsError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="row" style={{ justifyContent: 'center' }}>
           <button onClick={handleQuery} disabled={!canQuery} className="btnSecondary">
