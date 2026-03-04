@@ -13,6 +13,8 @@ Además soporta autenticación por **sesión** (login) y UI por rol (estudiante/
 
 Para docentes/admin, la vista de Resultados permite exportar a **Excel (CSV)** los resultados consultados.
 
+También permite **carga masiva de preguntas** (JSON) para crear/actualizar el banco del examen por configuración.
+
 Documentación de snapshot del estado actual: ver `../Documents/frontend-summary.md`.
 
 ---
@@ -96,6 +98,18 @@ cd ../backend
 Incluye una pantalla de **Resultados** para consultar intentos SUBMITTED por configuración:
 
 - `GET /api/examenes/resultados?periodoId=...&materiaId=...&momentoId=...&docenteResponsableId=...`
+
+### Carga masiva de preguntas (JSON)
+
+En la pantalla de **Resultados** (docente/admin) hay una sección **"Cargar preguntas (JSON)"**.
+
+- Crea el examen (si no existe) y carga preguntas al banco para la combinación:
+  - Periodo + Materia + Momento + Docente
+- Acepta JSON en dos formatos:
+  - **snake_case**: `opcion_a`, `opcion_b`, `opcion_c`, `opcion_d`
+  - **camelCase**: `opcionA`, `opcionB`, `opcionC`, `opcionD`
+- Campos esperados por pregunta: `enunciado`, opciones A-D, `correcta` (A|B|C|D), `explicacion` (opcional)
+- Campos extra (ej. `id`, `examen_id`) se ignoran.
 
 ---
 
