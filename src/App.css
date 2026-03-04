@@ -167,13 +167,13 @@
   display: grid;
   gap: 6px;
   grid-template-columns:
-    minmax(140px, 0.7fr)
+    minmax(120px, 0.7fr)
     minmax(220px, 1.4fr)
-    minmax(140px, 0.7fr)
-    minmax(260px, 1.6fr);
+    minmax(140px, 0.8fr)
+    minmax(260px, 1.6fr)
+    minmax(150px, 0.8fr);
   grid-template-areas:
-    'periodo materia estado docente'
-    'momento momento momento momento';
+    'periodo materia momento docente estado';
   align-items: end;
 }
 
@@ -182,7 +182,7 @@
     grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.2fr);
     grid-template-areas:
       'periodo materia'
-      'docente momento'
+      'momento docente'
       'estado estado';
   }
 }
