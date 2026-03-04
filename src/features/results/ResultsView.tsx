@@ -35,6 +35,12 @@ type ExamenBankLoadResponse = {
   totalBanco: number
 }
 
+type ExamenEnsureResponse = {
+  examenId: number
+  created: boolean
+  totalBanco: number
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -104,6 +110,12 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return String(msg)
 }
 
+function extractErrorStatus(err: unknown): number | null {
+  if (!err || typeof err !== 'object') return null
+  const status = (err as Record<string, unknown>).status
+  return typeof status === 'number' ? status : null
+}
+
 function toPositiveInt(value: string): number | null {
   const n = Number(value)
   if (!Number.isFinite(n)) return null
@@ -167,6 +179,10 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const [ensuring, setEnsuring] = useState(false)
+  const [ensureError, setEnsureError] = useState<string | null>(null)
+  const [ensuredExamenId, setEnsuredExamenId] = useState<number | null>(null)
 
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [periodos, setPeriodos] = useState<Periodo[]>([])
@@ -275,6 +291,16 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     !busy &&
     !uploadBusy &&
     Boolean(uploadFile) &&
+    (Boolean(ensuredExamenId) || Boolean(data?.examenId)) &&
+    parsed.periodoId &&
+    parsed.materiaId &&
+    parsed.momentoId &&
+    parsed.docenteResponsableId
+
+  const canEnsure =
+    !busy &&
+    !uploadBusy &&
+    !ensuring &&
     parsed.periodoId &&
     parsed.materiaId &&
     parsed.momentoId &&
@@ -302,12 +328,53 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
       const res = await apiGetJson<ExamenResultadosResponse>(`/examenes/resultados?${qs.toString()}`)
       setData(res)
+      setEnsuredExamenId(res?.examenId ?? null)
       setPage(1)
     } catch (e: unknown) {
       setError(extractErrorMessage(e, 'No se pudieron cargar los resultados'))
       setData(null)
+      // If the exam does not exist yet, keep ensuredExamenId null.
+      if (extractErrorStatus(e) === 404) {
+        setEnsuredExamenId(null)
+      }
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleEnsureExam() {
+    if (!canEnsure) return
+
+    setEnsuring(true)
+    setEnsureError(null)
+    setToast(null)
+
+    try {
+      const payload = {
+        periodoId: parsed.periodoId as number,
+        materiaId: parsed.materiaId as number,
+        momentoId: parsed.momentoId as number,
+        docenteResponsableId: parsed.docenteResponsableId as number,
+      }
+
+      const res = await apiPostJson<ExamenEnsureResponse>('/examenes/asegurar', payload)
+      setEnsuredExamenId(res.examenId)
+
+      setToast({
+        kind: 'success',
+        message: res.created
+          ? `Examen creado con éxito (ID ${res.examenId}). Banco actual: ${res.totalBanco}.`
+          : `Examen ya existía (ID ${res.examenId}). Banco actual: ${res.totalBanco}.`,
+      })
+
+      // Best-effort refresh so the exam becomes visible in the view.
+      await handleQuery()
+    } catch (e: unknown) {
+      const msg = extractErrorMessage(e, 'No se pudo crear el examen')
+      setEnsureError(msg)
+      setToast({ kind: 'error', message: `Crear examen falló: ${msg}` })
+    } finally {
+      setEnsuring(false)
     }
   }
 
@@ -516,6 +583,28 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             Acepta snake_case (opcion_a) o camelCase (opcionA). El examen se crea/actualiza con Periodo+Materia+Momento+Docente.
           </div>
 
+          <div className="row" style={{ gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btnSecondary headerBtn"
+              disabled={!canEnsure}
+              onClick={handleEnsureExam}
+            >
+              {ensuring ? 'Creando…' : 'Crear examen'}
+            </button>
+            <div className="muted" style={{ fontSize: 12 }}>
+              {ensuredExamenId || data?.examenId
+                ? `Examen ID: ${ensuredExamenId ?? data?.examenId}`
+                : 'Aún no existe un examen para esta configuración. Créalo para habilitar la carga.'}
+            </div>
+          </div>
+
+          {ensureError ? (
+            <p style={{ margin: 0, marginTop: 8 }}>
+              <strong>Crear examen:</strong> {ensureError}
+            </p>
+          ) : null}
+
           <div className="row" style={{ justifyContent: 'space-between', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
             <input
               type="file"
@@ -532,6 +621,12 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
               {uploadBusy ? 'Cargando…' : 'Cargar preguntas'}
             </button>
           </div>
+
+          {!ensuredExamenId && !data?.examenId ? (
+            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+              Para cargar preguntas primero debes crear el examen (botón "Crear examen") o consultarlo si ya existe.
+            </div>
+          ) : null}
 
           {uploadError ? (
             <p style={{ margin: 0, marginTop: 8 }}>
