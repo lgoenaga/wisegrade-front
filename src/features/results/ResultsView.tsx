@@ -297,14 +297,18 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     parsed.momentoId &&
     parsed.docenteResponsableId
 
-  const canEnsure =
-    !busy &&
-    !uploadBusy &&
-    !ensuring &&
-    parsed.periodoId &&
-    parsed.materiaId &&
-    parsed.momentoId &&
-    parsed.docenteResponsableId
+  const ensureDisabledReason = useMemo(() => {
+    if (busy) return 'Espera a que termine la consulta.'
+    if (uploadBusy) return 'Espera a que termine la carga de preguntas.'
+    if (ensuring) return 'Creación de examen en curso.'
+    if (!parsed.periodoId) return 'Selecciona un periodo para poder crear el examen.'
+    if (!parsed.materiaId) return 'Selecciona una materia para poder crear el examen.'
+    if (!parsed.momentoId) return 'Selecciona un momento para poder crear el examen.'
+    if (!parsed.docenteResponsableId) return 'Selecciona un docente responsable para poder crear el examen.'
+    return null
+  }, [busy, ensuring, parsed.docenteResponsableId, parsed.materiaId, parsed.momentoId, parsed.periodoId, uploadBusy])
+
+  const canEnsure = ensureDisabledReason == null
 
   const selectedMateriaNombre = useMemo(() => {
     if (!parsed.materiaId) return null
@@ -595,7 +599,8 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             <div className="muted" style={{ fontSize: 12 }}>
               {ensuredExamenId || data?.examenId
                 ? `Examen ID: ${ensuredExamenId ?? data?.examenId}`
-                : 'Aún no existe un examen para esta configuración. Créalo para habilitar la carga.'}
+                : 'Aún no existe un examen para esta configuración.'}
+              {ensureDisabledReason ? ` ${ensureDisabledReason}` : ' Créalo para habilitar la carga.'}
             </div>
           </div>
 
