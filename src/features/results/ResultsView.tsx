@@ -234,6 +234,8 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [momentoId, setMomentoId] = useState('')
   const [docenteResponsableId, setDocenteResponsableId] = useState('')
 
+  const [activeModal, setActiveModal] = useState<'PREGUNTAS' | 'ESTUDIANTES' | null>(null)
+
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoIntentoFiltro>('TODOS')
 
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -663,11 +665,36 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   return (
     <div className="resultsContainer">
       <div className="card stack resultsCard">
-        <div>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Resultados</h2>
-          <p className="muted" style={{ marginTop: 3, marginBottom: 0, fontSize: 13 }}>
-            Consulta los intentos para una configuración.
-          </p>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Resultados</h2>
+            <p className="muted" style={{ marginTop: 3, marginBottom: 0, fontSize: 13 }}>
+              Consulta los intentos para una configuración.
+            </p>
+          </div>
+
+          <div className="row" style={{ justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btnSecondary headerBtn"
+              onClick={() => setActiveModal('PREGUNTAS')}
+              disabled={deletingIntentoId != null}
+              title="Cargar preguntas (JSON)"
+            >
+              Cargar preguntas
+            </button>
+            {rol === 'ADMIN' ? (
+              <button
+                type="button"
+                className="btnSecondary headerBtn"
+                onClick={() => setActiveModal('ESTUDIANTES')}
+                disabled={deletingIntentoId != null}
+                title="Cargar estudiantes (JSON)"
+              >
+                Cargar estudiantes
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {catalogError ? (
@@ -734,68 +761,72 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             </select>
           </div>
 
-          <div className="field">
-            <label>Estado</label>
-            <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value as EstadoIntentoFiltro)}>
-              <option value="TODOS">Todos</option>
-              <option value="ENVIADOS">Enviados</option>
-              <option value="EN_PROGRESO">En progreso</option>
-            </select>
-          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div className="row" style={{ gap: 10, alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+              <div className="field" style={{ flex: '0 0 180px', minWidth: 160 }}>
+                <label>Estado</label>
+                <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value as EstadoIntentoFiltro)}>
+                  <option value="TODOS">Todos</option>
+                  <option value="ENVIADOS">Enviados</option>
+                  <option value="EN_PROGRESO">En progreso</option>
+                </select>
+              </div>
 
-          <div className="field">
-            <label>Docente responsable</label>
-            <select
-              value={docenteResponsableId}
-              onChange={(e) => setDocenteResponsableId(e.target.value)}
-              disabled={Boolean(lockedDocenteId) || (Boolean(parsed.materiaId) && docentesForMateria.length === 0)}
-            >
-              <option value="">
-                {parsed.materiaId && docentesForMateria.length === 0
-                  ? 'La materia no tiene docentes asociados'
-                  : 'Selecciona un docente…'}
-              </option>
-              {docentesActivos.map((d) => (
-                <option key={d.id} value={String(d.id)}>
-                  {d.id} — {d.nombres} {d.apellidos}
-                </option>
-              ))}
-            </select>
+              <div className="field" style={{ flex: '1 1 520px', minWidth: 240 }}>
+                <label>Docente responsable</label>
+                <select
+                  value={docenteResponsableId}
+                  onChange={(e) => setDocenteResponsableId(e.target.value)}
+                  disabled={Boolean(lockedDocenteId) || (Boolean(parsed.materiaId) && docentesForMateria.length === 0)}
+                >
+                  <option value="">
+                    {parsed.materiaId && docentesForMateria.length === 0
+                      ? 'La materia no tiene docentes asociados'
+                      : 'Selecciona un docente…'}
+                  </option>
+                  {docentesActivos.map((d) => (
+                    <option key={d.id} value={String(d.id)}>
+                      {d.id} — {d.nombres} {d.apellidos}
+                    </option>
+                  ))}
+                </select>
 
-            {rol === 'ADMIN' && parsed.materiaId && docentesForMateria.length === 0 ? (
-              <div style={{ marginTop: 8 }}>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  La materia no tiene docentes asociados. Asocia un docente a la materia para poder crear el examen.
-                </div>
-                <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-                  <select
-                    value={associateDocenteId}
-                    onChange={(e) => setAssociateDocenteId(e.target.value)}
-                    disabled={associating || busy || uploadBusy || ensuring}
-                  >
-                    <option value="">Selecciona un docente para asociar…</option>
-                    {allDocentesActivos.map((d) => (
-                      <option key={d.id} value={String(d.id)}>
-                        {d.id} — {d.nombres} {d.apellidos}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="btnSecondary headerBtn"
-                    disabled={associating || !toPositiveInt(associateDocenteId)}
-                    onClick={handleAssociateDocenteToMateria}
-                  >
-                    {associating ? 'Asociando…' : 'Asociar'}
-                  </button>
-                </div>
-                {associateError ? (
-                  <div style={{ marginTop: 6 }}>
-                    <strong>Asociar docente:</strong> {associateError}
+                {rol === 'ADMIN' && parsed.materiaId && docentesForMateria.length === 0 ? (
+                  <div style={{ marginTop: 8 }}>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      La materia no tiene docentes asociados. Asocia un docente a la materia para poder crear el examen.
+                    </div>
+                    <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                      <select
+                        value={associateDocenteId}
+                        onChange={(e) => setAssociateDocenteId(e.target.value)}
+                        disabled={associating || busy || uploadBusy || ensuring}
+                      >
+                        <option value="">Selecciona un docente para asociar…</option>
+                        {allDocentesActivos.map((d) => (
+                          <option key={d.id} value={String(d.id)}>
+                            {d.id} — {d.nombres} {d.apellidos}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="btnSecondary headerBtn"
+                        disabled={associating || !toPositiveInt(associateDocenteId)}
+                        onClick={handleAssociateDocenteToMateria}
+                      >
+                        {associating ? 'Asociando…' : 'Asociar'}
+                      </button>
+                    </div>
+                    {associateError ? (
+                      <div style={{ marginTop: 6 }}>
+                        <strong>Asociar docente:</strong> {associateError}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
-            ) : null}
+            </div>
           </div>
         </div>
 
@@ -803,108 +834,6 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
           <p style={{ margin: 0 }}>
             <strong>Error:</strong> {error}
           </p>
-        ) : null}
-
-        <div className="card" style={{ padding: 10 }}>
-          <div style={{ fontWeight: 800 }}>Cargar preguntas (JSON)</div>
-          <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-            Acepta snake_case (opcion_a) o camelCase (opcionA). El examen se crea/actualiza con Periodo+Materia+Momento+Docente.
-          </div>
-
-          <div className="row" style={{ gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btnSecondary headerBtn"
-              disabled={!canEnsure}
-              onClick={handleEnsureExam}
-            >
-              {ensuring ? 'Creando…' : 'Crear examen'}
-            </button>
-            <div className="muted" style={{ fontSize: 12 }}>
-              {ensuredExamenId || data?.examenId
-                ? `Examen ID: ${ensuredExamenId ?? data?.examenId}`
-                : 'Aún no existe un examen para esta configuración.'}
-              {ensureDisabledReason ? ` ${ensureDisabledReason}` : ' Créalo para habilitar la carga.'}
-            </div>
-          </div>
-
-          {ensureError ? (
-            <p style={{ margin: 0, marginTop: 8 }}>
-              <strong>Crear examen:</strong> {ensureError}
-            </p>
-          ) : null}
-
-          <div className="row" style={{ justifyContent: 'space-between', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-            <input
-              type="file"
-              accept="application/json"
-              disabled={uploadBusy || busy}
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null
-                setUploadFile(f)
-                setUploadError(null)
-                setToast(null)
-              }}
-            />
-            <button type="button" className="btnSecondary headerBtn" disabled={!canUpload} onClick={handleUploadBank}>
-              {uploadBusy ? 'Cargando…' : 'Cargar preguntas'}
-            </button>
-          </div>
-
-          {!ensuredExamenId && !data?.examenId ? (
-            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-              Para cargar preguntas primero debes crear el examen (botón "Crear examen") o consultarlo si ya existe.
-            </div>
-          ) : null}
-
-          {uploadError ? (
-            <p style={{ margin: 0, marginTop: 8 }}>
-              <strong>Carga:</strong> {uploadError}
-            </p>
-          ) : null}
-
-          {rol === 'DOCENTE' ? (
-            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-              Nota: como docente, el sistema asocia la carga automáticamente a tu usuario.
-            </div>
-          ) : null}
-        </div>
-
-        {rol === 'ADMIN' ? (
-          <div className="card" style={{ padding: 10 }}>
-            <div style={{ fontWeight: 800 }}>Cargar estudiantes (JSON)</div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-              Carga masiva de estudiantes. Omite duplicados por documento.
-            </div>
-
-            <div className="row" style={{ justifyContent: 'space-between', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-              <input
-                type="file"
-                accept="application/json"
-                disabled={studentsBusy || busy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null
-                  setStudentsFile(f)
-                  setStudentsError(null)
-                  setToast(null)
-                }}
-              />
-              <button
-                type="button"
-                className="btnSecondary headerBtn"
-                disabled={!studentsFile || studentsBusy || busy}
-                onClick={handleUploadStudents}
-              >
-                {studentsBusy ? 'Cargando…' : 'Cargar estudiantes'}
-              </button>
-            </div>
-
-            {studentsError ? (
-              <p style={{ margin: 0, marginTop: 8 }}>
-                <strong>Carga estudiantes:</strong> {studentsError}
-              </p>
-            ) : null}
-          </div>
         ) : null}
 
         <div className="row" style={{ justifyContent: 'center' }}>
@@ -1165,6 +1094,157 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                   {deletingIntentoId != null ? 'Eliminando…' : 'Eliminar'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeModal ? (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} role="dialog" aria-modal="true">
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'var(--wg-bg)', opacity: 0.85 }}
+            onClick={() => {
+              if (uploadBusy || studentsBusy || ensuring || associating) return
+              setActiveModal(null)
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'grid',
+              placeItems: 'center',
+              padding: 16,
+            }}
+          >
+            <div className="card" style={{ width: 'min(720px, 100%)', padding: 12 }}>
+              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>
+                  {activeModal === 'PREGUNTAS' ? 'Cargar preguntas (JSON)' : 'Cargar estudiantes (JSON)'}
+                </div>
+                <button
+                  type="button"
+                  className="btnSecondary headerBtn"
+                  onClick={() => setActiveModal(null)}
+                  disabled={uploadBusy || studentsBusy || ensuring || associating}
+                  title="Cerrar"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              {activeModal === 'PREGUNTAS' ? (
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    Acepta snake_case (opcion_a) o camelCase (opcionA). El examen se crea/actualiza con
+                    Periodo+Materia+Momento+Docente.
+                  </div>
+
+                  <div className="row" style={{ gap: 10, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="btnSecondary headerBtn"
+                      disabled={!canEnsure}
+                      onClick={handleEnsureExam}
+                    >
+                      {ensuring ? 'Creando…' : 'Crear examen'}
+                    </button>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {ensuredExamenId || data?.examenId
+                        ? `Examen ID: ${ensuredExamenId ?? data?.examenId}`
+                        : 'Aún no existe un examen para esta configuración.'}
+                      {ensureDisabledReason ? ` ${ensureDisabledReason}` : ' Créalo para habilitar la carga.'}
+                    </div>
+                  </div>
+
+                  {ensureError ? (
+                    <p style={{ margin: 0, marginTop: 8 }}>
+                      <strong>Crear examen:</strong> {ensureError}
+                    </p>
+                  ) : null}
+
+                  <div
+                    className="row"
+                    style={{ justifyContent: 'space-between', gap: 10, marginTop: 10, flexWrap: 'wrap' }}
+                  >
+                    <input
+                      type="file"
+                      accept="application/json"
+                      disabled={uploadBusy || busy}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null
+                        setUploadFile(f)
+                        setUploadError(null)
+                        setToast(null)
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btnSecondary headerBtn"
+                      disabled={!canUpload}
+                      onClick={handleUploadBank}
+                    >
+                      {uploadBusy ? 'Cargando…' : 'Cargar preguntas'}
+                    </button>
+                  </div>
+
+                  {!ensuredExamenId && !data?.examenId ? (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                      Para cargar preguntas primero debes crear el examen (botón "Crear examen") o consultarlo si ya
+                      existe.
+                    </div>
+                  ) : null}
+
+                  {uploadError ? (
+                    <p style={{ margin: 0, marginTop: 8 }}>
+                      <strong>Carga:</strong> {uploadError}
+                    </p>
+                  ) : null}
+
+                  {rol === 'DOCENTE' ? (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                      Nota: como docente, el sistema asocia la carga automáticamente a tu usuario.
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    Carga masiva de estudiantes. Omite duplicados por documento.
+                  </div>
+
+                  <div
+                    className="row"
+                    style={{ justifyContent: 'space-between', gap: 10, marginTop: 10, flexWrap: 'wrap' }}
+                  >
+                    <input
+                      type="file"
+                      accept="application/json"
+                      disabled={studentsBusy || busy}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null
+                        setStudentsFile(f)
+                        setStudentsError(null)
+                        setToast(null)
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btnSecondary headerBtn"
+                      disabled={!studentsFile || studentsBusy || busy}
+                      onClick={handleUploadStudents}
+                    >
+                      {studentsBusy ? 'Cargando…' : 'Cargar estudiantes'}
+                    </button>
+                  </div>
+
+                  {studentsError ? (
+                    <p style={{ margin: 0, marginTop: 8 }}>
+                      <strong>Carga estudiantes:</strong> {studentsError}
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
         </div>
