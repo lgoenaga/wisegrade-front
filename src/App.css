@@ -171,18 +171,31 @@
     minmax(220px, 1.4fr)
     minmax(140px, 0.7fr)
     minmax(260px, 1.6fr);
+  grid-template-areas:
+    'periodo materia estado docente'
+    'momento momento momento momento';
   align-items: end;
 }
 
 @media (max-width: 900px) {
   .resultsFiltersGrid {
     grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.2fr);
+    grid-template-areas:
+      'periodo materia'
+      'docente momento'
+      'estado estado';
   }
 }
 
 @media (max-width: 520px) {
   .resultsFiltersGrid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      'periodo'
+      'materia'
+      'docente'
+      'momento'
+      'estado';
   }
 }
 

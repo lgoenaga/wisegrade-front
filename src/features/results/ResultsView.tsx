@@ -704,7 +704,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
         ) : null}
 
         <div className="resultsFiltersGrid">
-          <div className="field">
+          <div className="field" style={{ gridArea: 'periodo' }}>
             <label>Periodo</label>
             <select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)}>
               <option value="">Selecciona un periodo…</option>
@@ -716,7 +716,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             </select>
           </div>
 
-          <div className="field">
+          <div className="field" style={{ gridArea: 'materia' }}>
             <label>Materia</label>
             <select
               value={materiaId}
@@ -749,7 +749,71 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             </select>
           </div>
 
-          <div className="field">
+          <div className="field" style={{ gridArea: 'estado' }}>
+            <label>Estado</label>
+            <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value as EstadoIntentoFiltro)}>
+              <option value="TODOS">Todos</option>
+              <option value="ENVIADOS">Enviados</option>
+              <option value="EN_PROGRESO">En progreso</option>
+            </select>
+          </div>
+
+          <div className="field" style={{ gridArea: 'docente' }}>
+            <label>Docente responsable</label>
+            <select
+              value={docenteResponsableId}
+              onChange={(e) => setDocenteResponsableId(e.target.value)}
+              disabled={Boolean(lockedDocenteId) || (Boolean(parsed.materiaId) && docentesForMateria.length === 0)}
+            >
+              <option value="">
+                {parsed.materiaId && docentesForMateria.length === 0
+                  ? 'La materia no tiene docentes asociados'
+                  : 'Selecciona un docente…'}
+              </option>
+              {docentesActivos.map((d) => (
+                <option key={d.id} value={String(d.id)}>
+                  {d.id} — {d.nombres} {d.apellidos}
+                </option>
+              ))}
+            </select>
+
+            {rol === 'ADMIN' && parsed.materiaId && docentesForMateria.length === 0 ? (
+              <div style={{ marginTop: 8 }}>
+                <div className="muted" style={{ fontSize: 12 }}>
+                  La materia no tiene docentes asociados. Asocia un docente a la materia para poder crear el examen.
+                </div>
+                <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                  <select
+                    value={associateDocenteId}
+                    onChange={(e) => setAssociateDocenteId(e.target.value)}
+                    disabled={associating || busy || uploadBusy || ensuring}
+                  >
+                    <option value="">Selecciona un docente para asociar…</option>
+                    {allDocentesActivos.map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.id} — {d.nombres} {d.apellidos}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    disabled={associating || !toPositiveInt(associateDocenteId)}
+                    onClick={handleAssociateDocenteToMateria}
+                  >
+                    {associating ? 'Asociando…' : 'Asociar'}
+                  </button>
+                </div>
+                {associateError ? (
+                  <div style={{ marginTop: 6 }}>
+                    <strong>Asociar docente:</strong> {associateError}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="field" style={{ gridArea: 'momento' }}>
             <label>Momento</label>
             <select value={momentoId} onChange={(e) => setMomentoId(e.target.value)}>
               <option value="">Selecciona un momento…</option>
@@ -759,74 +823,6 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div style={{ gridColumn: '1 / -1' }}>
-            <div className="row" style={{ gap: 10, alignItems: 'flex-start', flexWrap: 'nowrap' }}>
-              <div className="field" style={{ flex: '0 0 180px', minWidth: 160 }}>
-                <label>Estado</label>
-                <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value as EstadoIntentoFiltro)}>
-                  <option value="TODOS">Todos</option>
-                  <option value="ENVIADOS">Enviados</option>
-                  <option value="EN_PROGRESO">En progreso</option>
-                </select>
-              </div>
-
-              <div className="field" style={{ flex: '1 1 520px', minWidth: 240 }}>
-                <label>Docente responsable</label>
-                <select
-                  value={docenteResponsableId}
-                  onChange={(e) => setDocenteResponsableId(e.target.value)}
-                  disabled={Boolean(lockedDocenteId) || (Boolean(parsed.materiaId) && docentesForMateria.length === 0)}
-                >
-                  <option value="">
-                    {parsed.materiaId && docentesForMateria.length === 0
-                      ? 'La materia no tiene docentes asociados'
-                      : 'Selecciona un docente…'}
-                  </option>
-                  {docentesActivos.map((d) => (
-                    <option key={d.id} value={String(d.id)}>
-                      {d.id} — {d.nombres} {d.apellidos}
-                    </option>
-                  ))}
-                </select>
-
-                {rol === 'ADMIN' && parsed.materiaId && docentesForMateria.length === 0 ? (
-                  <div style={{ marginTop: 8 }}>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      La materia no tiene docentes asociados. Asocia un docente a la materia para poder crear el examen.
-                    </div>
-                    <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-                      <select
-                        value={associateDocenteId}
-                        onChange={(e) => setAssociateDocenteId(e.target.value)}
-                        disabled={associating || busy || uploadBusy || ensuring}
-                      >
-                        <option value="">Selecciona un docente para asociar…</option>
-                        {allDocentesActivos.map((d) => (
-                          <option key={d.id} value={String(d.id)}>
-                            {d.id} — {d.nombres} {d.apellidos}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="btnSecondary headerBtn"
-                        disabled={associating || !toPositiveInt(associateDocenteId)}
-                        onClick={handleAssociateDocenteToMateria}
-                      >
-                        {associating ? 'Asociando…' : 'Asociar'}
-                      </button>
-                    </div>
-                    {associateError ? (
-                      <div style={{ marginTop: 6 }}>
-                        <strong>Asociar docente:</strong> {associateError}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </div>
           </div>
         </div>
 
