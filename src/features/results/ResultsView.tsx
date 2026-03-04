@@ -170,11 +170,15 @@ type Props = {
   rol?: 'ADMIN' | 'DOCENTE'
 }
 
+type EstadoIntentoFiltro = 'TODOS' | 'ENVIADOS' | 'EN_PROGRESO'
+
 export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [periodoId, setPeriodoId] = useState('')
   const [materiaId, setMateriaId] = useState('')
   const [momentoId, setMomentoId] = useState('')
   const [docenteResponsableId, setDocenteResponsableId] = useState('')
+
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoIntentoFiltro>('TODOS')
 
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadBusy, setUploadBusy] = useState(false)
@@ -334,12 +338,13 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     setError(null)
 
     try {
+      const includeInProgress = estadoFiltro !== 'ENVIADOS'
       const qs = new URLSearchParams({
         periodoId: String(parsed.periodoId),
         materiaId: String(parsed.materiaId),
         momentoId: String(parsed.momentoId),
         docenteResponsableId: String(parsed.docenteResponsableId),
-        includeInProgress: 'true',
+        includeInProgress: includeInProgress ? 'true' : 'false',
       })
 
       const res = await apiGetJson<ExamenResultadosResponse>(`/examenes/resultados?${qs.toString()}`)
@@ -357,6 +362,10 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
       setBusy(false)
     }
   }
+
+  useEffect(() => {
+    setPage(1)
+  }, [estadoFiltro])
 
   async function handleEnsureExam() {
     if (!canEnsure) return
@@ -507,8 +516,11 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   }
 
   const filas = useMemo(() => {
-    return data?.filas ?? []
-  }, [data])
+    const all = data?.filas ?? []
+    if (estadoFiltro === 'TODOS') return all
+    if (estadoFiltro === 'ENVIADOS') return all.filter((f) => f.estado === 'SUBMITTED')
+    return all.filter((f) => f.estado === 'IN_PROGRESS')
+  }, [data, estadoFiltro])
   const totalPages = useMemo(() => {
     const n = Math.ceil(filas.length / pageSize)
     return Math.max(1, n)
@@ -596,6 +608,15 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                   {m.id} — {m.nombre}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Estado</label>
+            <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value as EstadoIntentoFiltro)}>
+              <option value="TODOS">Todos</option>
+              <option value="ENVIADOS">Enviados</option>
+              <option value="EN_PROGRESO">En progreso</option>
             </select>
           </div>
 
