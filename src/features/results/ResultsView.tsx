@@ -1,11 +1,100 @@
 import { useEffect, useMemo, useState } from 'react'
-import { apiDelete, apiGetJson } from '../../lib/api'
+import { apiDelete, apiGetJson, apiPostJson } from '../../lib/api'
 import type { ExamenResultadosResponse } from './types'
 
 type Periodo = { id: number; anio: number; nombre: string }
 type Materia = { id: number; nombre: string; nivelId: number; docenteIds: number[] }
 type Momento = { id: number; nombre: string }
 type Docente = { id: number; nombres: string; apellidos: string; documento: string; activo: boolean }
+
+type RespuestaCorrecta = 'A' | 'B' | 'C' | 'D'
+
+type PreguntaCreateRequest = {
+  enunciado: string
+  opcionA: string
+  opcionB: string
+  opcionC: string
+  opcionD: string
+  correcta: RespuestaCorrecta
+  explicacion?: string | null
+}
+
+type ExamenBankLoadRequest = {
+  periodoId: number
+  materiaId: number
+  momentoId: number
+  docenteResponsableId: number
+  preguntas: PreguntaCreateRequest[]
+}
+
+type ExamenBankLoadResponse = {
+  examenId: number
+  preguntasRecibidas: number
+  preguntasAgregadas: number
+  preguntasOmitidas: number
+  totalBanco: number
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function pickString(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = obj[k]
+    if (typeof v === 'string') return v
+  }
+  return null
+}
+
+function normalizeNonEmpty(value: string | null, field: string, index: number): string {
+  const s = (value ?? '').trim()
+  if (!s) throw new Error(`Pregunta #${index + 1}: falta campo ${field}`)
+  return s
+}
+
+function parseCorrecta(value: string | null, index: number): RespuestaCorrecta {
+  const raw = (value ?? '').trim().toUpperCase()
+  if (raw === 'A' || raw === 'B' || raw === 'C' || raw === 'D') return raw
+  throw new Error(`Pregunta #${index + 1}: campo correcta inválido (${raw || 'vacío'})`)
+}
+
+function parsePreguntasJson(raw: unknown): PreguntaCreateRequest[] {
+  const items: unknown[] = Array.isArray(raw)
+    ? raw
+    : isRecord(raw) && Array.isArray(raw.preguntas)
+      ? (raw.preguntas as unknown[])
+      : []
+
+  if (!items.length) {
+    throw new Error('El JSON debe ser un arreglo de preguntas o un objeto con propiedad preguntas[].')
+  }
+
+  return items.map((item, i) => {
+    if (!isRecord(item)) throw new Error(`Pregunta #${i + 1}: objeto inválido`)
+
+    const enunciado = normalizeNonEmpty(pickString(item, ['enunciado']), 'enunciado', i)
+
+    const opcionA = normalizeNonEmpty(pickString(item, ['opcionA', 'opcion_a']), 'opcionA/opcion_a', i)
+    const opcionB = normalizeNonEmpty(pickString(item, ['opcionB', 'opcion_b']), 'opcionB/opcion_b', i)
+    const opcionC = normalizeNonEmpty(pickString(item, ['opcionC', 'opcion_c']), 'opcionC/opcion_c', i)
+    const opcionD = normalizeNonEmpty(pickString(item, ['opcionD', 'opcion_d']), 'opcionD/opcion_d', i)
+
+    const correcta = parseCorrecta(pickString(item, ['correcta']), i)
+    const explicacionRaw = pickString(item, ['explicacion'])
+    const explicacion = explicacionRaw != null ? explicacionRaw.trim() : null
+
+    return {
+      enunciado,
+      opcionA,
+      opcionB,
+      opcionC,
+      opcionD,
+      correcta,
+      explicacion,
+    }
+  })
+}
 
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (!err || typeof err !== 'object') return fallback
@@ -74,6 +163,10 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [materiaId, setMateriaId] = useState('')
   const [momentoId, setMomentoId] = useState('')
   const [docenteResponsableId, setDocenteResponsableId] = useState('')
+
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadBusy, setUploadBusy] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [periodos, setPeriodos] = useState<Periodo[]>([])
@@ -178,6 +271,15 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const canQuery =
     !busy && parsed.periodoId && parsed.materiaId && parsed.momentoId && parsed.docenteResponsableId
 
+  const canUpload =
+    !busy &&
+    !uploadBusy &&
+    Boolean(uploadFile) &&
+    parsed.periodoId &&
+    parsed.materiaId &&
+    parsed.momentoId &&
+    parsed.docenteResponsableId
+
   const selectedMateriaNombre = useMemo(() => {
     if (!parsed.materiaId) return null
     return materias.find((m) => m.id === parsed.materiaId)?.nombre ?? null
@@ -206,6 +308,41 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
       setData(null)
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleUploadBank() {
+    if (!canUpload || !uploadFile) return
+
+    setUploadBusy(true)
+    setUploadError(null)
+    setToast(null)
+
+    try {
+      const text = await uploadFile.text()
+      const raw = JSON.parse(text) as unknown
+      const preguntas = parsePreguntasJson(raw)
+
+      const payload: ExamenBankLoadRequest = {
+        periodoId: parsed.periodoId as number,
+        materiaId: parsed.materiaId as number,
+        momentoId: parsed.momentoId as number,
+        docenteResponsableId: parsed.docenteResponsableId as number,
+        preguntas,
+      }
+
+      const res = await apiPostJson<ExamenBankLoadResponse>('/examenes/banco', payload)
+
+      setToast({
+        kind: 'success',
+        message: `Banco cargado. Examen ${res.examenId}: +${res.preguntasAgregadas} (omitidas ${res.preguntasOmitidas}), total ${res.totalBanco}.`,
+      })
+    } catch (e: unknown) {
+      const msg = extractErrorMessage(e, 'No se pudo cargar el banco')
+      setUploadError(msg)
+      setToast({ kind: 'error', message: `La carga falló: ${msg}` })
+    } finally {
+      setUploadBusy(false)
     }
   }
 
@@ -372,6 +509,42 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
             <strong>Error:</strong> {error}
           </p>
         ) : null}
+
+        <div className="card" style={{ padding: 10 }}>
+          <div style={{ fontWeight: 800 }}>Cargar preguntas (JSON)</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+            Acepta snake_case (opcion_a) o camelCase (opcionA). El examen se crea/actualiza con Periodo+Materia+Momento+Docente.
+          </div>
+
+          <div className="row" style={{ justifyContent: 'space-between', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+            <input
+              type="file"
+              accept="application/json"
+              disabled={uploadBusy || busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null
+                setUploadFile(f)
+                setUploadError(null)
+                setToast(null)
+              }}
+            />
+            <button type="button" className="btnSecondary headerBtn" disabled={!canUpload} onClick={handleUploadBank}>
+              {uploadBusy ? 'Cargando…' : 'Cargar preguntas'}
+            </button>
+          </div>
+
+          {uploadError ? (
+            <p style={{ margin: 0, marginTop: 8 }}>
+              <strong>Carga:</strong> {uploadError}
+            </p>
+          ) : null}
+
+          {rol === 'DOCENTE' ? (
+            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+              Nota: como docente, el sistema asocia la carga automáticamente a tu usuario.
+            </div>
+          ) : null}
+        </div>
 
         <div className="row" style={{ justifyContent: 'center' }}>
           <button onClick={handleQuery} disabled={!canQuery} className="btnSecondary">
