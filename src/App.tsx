@@ -276,6 +276,18 @@ function App() {
             <div className="appSubtitle">Examen en línea</div>
           </div>
           <div className="appHeaderActions">
+            {me && !attempt && me.rol === 'ADMIN' ? (
+              screen !== 'results' ? (
+                <button className="btnSecondary headerBtn" onClick={() => setScreen('results')}>
+                  Ver resultados
+                </button>
+              ) : (
+                <button className="btnSecondary headerBtn" onClick={() => setScreen('start')}>
+                  Volver
+                </button>
+              )
+            ) : null}
+
             {me && me.rol === 'ADMIN' ? (
               <div className="headerMenu" onClick={(e) => e.stopPropagation()}>
                 <button
@@ -311,18 +323,6 @@ function App() {
               <button className="btnSecondary headerBtn" onClick={handleLogout}>
                 Salir
               </button>
-            ) : null}
-
-            {me && !attempt && me.rol === 'ADMIN' ? (
-              screen !== 'results' ? (
-                <button className="btnSecondary headerBtn" onClick={() => setScreen('results')}>
-                  Ver resultados
-                </button>
-              ) : (
-                <button className="btnSecondary headerBtn" onClick={() => setScreen('start')}>
-                  Volver
-                </button>
-              )
             ) : null}
           </div>
         </div>
