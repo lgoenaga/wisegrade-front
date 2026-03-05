@@ -146,6 +146,10 @@
   line-height: 1.1;
 }
 
+.btnAction {
+  min-width: 96px;
+}
+
 .appMain {
   flex: 1;
   max-width: 980px;

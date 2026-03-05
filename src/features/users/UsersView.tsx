@@ -130,8 +130,8 @@ function EstudianteCombobox({
   }, [disabled])
 
   return (
-    <div className="field" style={{ position: 'relative', minWidth: 320 }}>
-      <label>Estudiante</label>
+    <label style={{ position: 'relative', minWidth: 320 }}>
+      Estudiante
       <input
         value={query}
         onChange={(e) => {
@@ -206,7 +206,7 @@ function EstudianteCombobox({
           Requerido
         </div>
       ) : null}
-    </div>
+    </label>
   )
 }
 
@@ -489,7 +489,7 @@ export default function UsersView() {
           </label>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
-            <button type="submit" className="btnCompact" disabled={loading}>
+            <button type="submit" className="btnCompact btnAction" disabled={loading}>
               Crear
             </button>
           </div>
@@ -531,7 +531,7 @@ export default function UsersView() {
                   ? `${filteredUsers.length}/${users.length} usuario(s)`
                   : `${users.length} usuario(s)`}
             </div>
-            <button type="button" className="btnCompact" onClick={refresh} disabled={loading}>
+            <button type="button" className="btnCompact btnAction" onClick={refresh} disabled={loading}>
               Recargar
             </button>
           </div>
@@ -573,7 +573,7 @@ export default function UsersView() {
                       <button type="button" className="btnCompact" onClick={() => setSelectedId(u.id)} disabled={loading}>
                         Editar
                       </button>
-                      <button type="button" className="btnCompact" onClick={() => onDelete(u)} disabled={loading}>
+                      <button type="button" className="btnCompact btnAction" onClick={() => onDelete(u)} disabled={loading}>
                         Eliminar
                       </button>
                     </div>
@@ -644,7 +644,7 @@ export default function UsersView() {
               <button type="button" className="btnCompact" onClick={() => setSelectedId(null)} disabled={loading}>
                 Cerrar
               </button>
-              <button type="submit" className="btnCompact" disabled={loading}>
+              <button type="submit" className="btnCompact btnAction" disabled={loading}>
                 Guardar
               </button>
             </div>
