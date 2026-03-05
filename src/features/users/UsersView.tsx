@@ -446,7 +446,7 @@ export default function UsersView() {
 
       <form onSubmit={onCreate} className="card" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Crear</h3>
-        <div className="row">
+        <div className="row rowNoWrapWide">
           <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
             Documento
             <input value={createDocumento} onChange={(e) => setCreateDocumento(e.target.value)} required />
@@ -455,7 +455,15 @@ export default function UsersView() {
             Clave
             <input value={createClave} onChange={(e) => setCreateClave(e.target.value)} type="password" required />
           </label>
-          <label>
+          <EstudianteCombobox
+            disabled={createRol !== 'ESTUDIANTE'}
+            required={createRol === 'ESTUDIANTE'}
+            estudiantes={estudiantes}
+            selectedId={createEstudianteId}
+            onSelectedId={setCreateEstudianteId}
+            resetKey={createEstudianteResetKey}
+          />
+          <label style={{ flex: '0 1 160px', maxWidth: 220 }}>
             Rol
             <select value={createRol} onChange={(e) => setCreateRol(e.target.value as UserRole)}>
               <option value="ADMIN">ADMIN</option>
@@ -479,15 +487,7 @@ export default function UsersView() {
               disabled={createRol !== 'DOCENTE'}
             />
           </label>
-          <EstudianteCombobox
-            disabled={createRol !== 'ESTUDIANTE'}
-            required={createRol === 'ESTUDIANTE'}
-            estudiantes={estudiantes}
-            selectedId={createEstudianteId}
-            onSelectedId={setCreateEstudianteId}
-            resetKey={createEstudianteResetKey}
-          />
-          <div />
+          <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
             <button type="submit" className="btnCompact" disabled={loading}>
               Crear
@@ -594,7 +594,7 @@ export default function UsersView() {
       {selected ? (
         <form onSubmit={onUpdate} className="card" style={{ gridColumn: 2 }}>
           <h3 style={{ margin: 0 }}>Editar #{selected.id}</h3>
-          <div className="row">
+          <div className="row rowNoWrapWide">
             <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
               Documento
               <input value={editDocumento} onChange={(e) => setEditDocumento(e.target.value)} required />
@@ -608,7 +608,14 @@ export default function UsersView() {
                 placeholder="Dejar vacío para no cambiar"
               />
             </label>
-            <label>
+            <EstudianteCombobox
+              disabled={editRol !== 'ESTUDIANTE'}
+              required={editRol === 'ESTUDIANTE'}
+              estudiantes={estudiantes}
+              selectedId={editEstudianteId}
+              onSelectedId={setEditEstudianteId}
+            />
+            <label style={{ flex: '0 1 160px', maxWidth: 220 }}>
               Rol
               <select value={editRol} onChange={(e) => setEditRol(e.target.value as UserRole)}>
                 <option value="ADMIN">ADMIN</option>
@@ -632,14 +639,7 @@ export default function UsersView() {
                 disabled={editRol !== 'DOCENTE'}
               />
             </label>
-            <EstudianteCombobox
-              disabled={editRol !== 'ESTUDIANTE'}
-              required={editRol === 'ESTUDIANTE'}
-              estudiantes={estudiantes}
-              selectedId={editEstudianteId}
-              onSelectedId={setEditEstudianteId}
-            />
-            <div />
+            <div style={{ flex: 1 }} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 8 }}>
               <button type="button" className="btnCompact" onClick={() => setSelectedId(null)} disabled={loading}>
                 Cerrar
