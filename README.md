@@ -36,8 +36,14 @@ cp .env.example .env.local
 
 Variables:
 
-- `VITE_API_BASE_URL` (default: `http://localhost:8080`)
-- `VITE_EXAM_DURATION_MINUTES` (default: `30`, solo countdown UI)
+- `VITE_API_BASE_URL` (default en código: `/api`)
+  - Recomendado en dev: `/api` (same-origin) para usar proxy y evitar CORS.
+- `VITE_DEV_BACKEND_URL` (default: `http://localhost:8080`)
+  - Usado por el proxy de Vite (solo dev server; no se bundlea al cliente).
+- `VITE_EXAM_DURATION_MINUTES`
+  - Duración del examen en minutos (solo UI countdown).
+  - Nota: el fallback en código es `60` si no se define.
+  - Recomendado: igualarlo a `APP_EXAM_DURATION_MINUTES` del backend (default `30`).
 
 ---
 
@@ -83,21 +89,40 @@ cd ../backend
   - `POST /api/auth/login`
   - `GET /api/auth/me`
   - `POST /api/auth/logout`
+  - (ADMIN) Gestión de usuarios:
+    - `GET /api/auth/users`
+    - `POST /api/auth/users`
+    - `PUT /api/auth/users/{id}`
+    - `DELETE /api/auth/users/{id}`
+    - `POST /api/auth/users/bulk/estudiantes`
+    - `POST /api/auth/users/bulk/docentes`
 
 - Catálogos:
   - `GET /api/periodos`
   - `GET /api/materias`
+  - `GET /api/materias/{id}/docentes`
+  - (ADMIN) `PUT /api/materias/{materiaId}/docentes/{docenteId}`
+  - (ADMIN) `DELETE /api/materias/{materiaId}/docentes/{docenteId}`
   - `GET /api/momentos`
   - `GET /api/docentes`
+  - `GET /api/estudiantes`
+  - (ADMIN) `POST /api/estudiantes`
 - Intentos:
   - `POST /api/intentos/iniciar`
+  - `POST /api/intentos/{intentoId}/guardar`
+  - `POST /api/intentos/{intentoId}/anticheat/block`
   - `POST /api/intentos/enviar`
   - `GET /api/intentos/{intentoId}`
   - `GET /api/intentos/{intentoId}/export/pdf`
+  - (DOCENTE/ADMIN) `POST /api/intentos/{intentoId}/reabrir`
+  - (DOCENTE/ADMIN) `POST /api/intentos/{intentoId}/force-submit`
+  - (DOCENTE/ADMIN) `DELETE /api/intentos/{intentoId}`
 
 Incluye una pantalla de **Resultados** para consultar intentos SUBMITTED por configuración:
 
-- `GET /api/examenes/resultados?periodoId=...&materiaId=...&momentoId=...&docenteResponsableId=...`
+- `POST /api/examenes/asegurar`
+- `POST /api/examenes/banco`
+- `GET /api/examenes/resultados?periodoId=...&materiaId=...&momentoId=...&docenteResponsableId=...&includeInProgress=false`
 
 ### Carga masiva de preguntas (JSON)
 
@@ -135,7 +160,9 @@ Para re-probar desde cero: borra claves `wisegrade:*` en el navegador.
 
 ## Troubleshooting
 
-- **CORS / cookies de sesión**: revisa `APP_CORS_ALLOWED_ORIGINS` en el backend (default `http://localhost:5173`).
+- **CORS / cookies de sesión**:
+  - Setup estándar (recomendado): `VITE_API_BASE_URL=/api` + proxy de Vite ⇒ normalmente no hay CORS.
+  - Si apuntas directo al backend (ej. `VITE_API_BASE_URL=http://localhost:8080`), revisa `APP_CORS_ALLOWED_ORIGINS` en el backend.
 - **Login falla**: si documento/clave no coinciden, el backend responde `401` con `"Credenciales inválidas"`.
 - **"Examen not found"**: falta cargar banco de preguntas para esa combinación (o falta asociación docente↔materia).
 - **Se queda en "pending submit"**: normalmente es backend caído/red inestable; al volver el backend el frontend reintenta cada ~5s.
