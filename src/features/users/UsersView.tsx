@@ -43,10 +43,16 @@ function parseNullableInt(value: string): number | null {
   return Number.isFinite(num) ? num : null
 }
 
+function normalizeText(value: string): string {
+  return value.trim().toLowerCase()
+}
+
 export default function UsersView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [users, setUsers] = useState<AuthUserResponse[]>([])
+
+  const [documentFilter, setDocumentFilter] = useState('')
 
   const [createDocumento, setCreateDocumento] = useState('')
   const [createClave, setCreateClave] = useState('')
@@ -65,6 +71,12 @@ export default function UsersView() {
   const [editActivo, setEditActivo] = useState(true)
   const [editDocenteId, setEditDocenteId] = useState<string>('')
   const [editEstudianteId, setEditEstudianteId] = useState<string>('')
+
+  const filteredUsers = useMemo(() => {
+    const q = normalizeText(documentFilter)
+    if (!q) return users
+    return users.filter((u) => normalizeText(u.documento).includes(q))
+  }, [users, documentFilter])
 
   async function refresh() {
     setLoading(true)
@@ -242,11 +254,35 @@ export default function UsersView() {
 
       <div className="card">
         <h3>Lista</h3>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>{loading ? 'Cargando…' : `${users.length} usuario(s)`}</div>
-          <button type="button" onClick={refresh} disabled={loading}>
-            Recargar
-          </button>
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div className="field" style={{ minWidth: 240 }}>
+            <label>Documento</label>
+            <input
+              value={documentFilter}
+              onChange={(e) => setDocumentFilter(e.target.value)}
+              placeholder="Filtrar…"
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="muted">
+              {loading
+                ? 'Cargando…'
+                : documentFilter.trim()
+                  ? `${filteredUsers.length}/${users.length} usuario(s)`
+                  : `${users.length} usuario(s)`}
+            </div>
+            <button type="button" onClick={refresh} disabled={loading}>
+              Recargar
+            </button>
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
@@ -263,7 +299,7 @@ export default function UsersView() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filteredUsers.map((u) => (
                 <tr key={u.id} style={{ borderTop: '1px solid rgba(0,0,0,0.1)' }}>
                   <td>{u.id}</td>
                   <td>
