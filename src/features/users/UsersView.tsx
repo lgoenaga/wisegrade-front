@@ -447,11 +447,11 @@ export default function UsersView() {
       <form onSubmit={onCreate} className="card" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Crear</h3>
         <div className="row">
-          <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
+          <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
             Documento
             <input value={createDocumento} onChange={(e) => setCreateDocumento(e.target.value)} required />
           </label>
-          <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
+          <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
             Clave
             <input value={createClave} onChange={(e) => setCreateClave(e.target.value)} type="password" required />
           </label>
@@ -469,7 +469,7 @@ export default function UsersView() {
           </label>
         </div>
         <div className="row">
-          <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
+          <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
             Docente ID
             <input
               value={createDocenteId}
@@ -595,11 +595,11 @@ export default function UsersView() {
         <form onSubmit={onUpdate} className="card" style={{ gridColumn: 2 }}>
           <h3 style={{ margin: 0 }}>Editar #{selected.id}</h3>
           <div className="row">
-            <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
+            <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
               Documento
               <input value={editDocumento} onChange={(e) => setEditDocumento(e.target.value)} required />
             </label>
-            <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
+            <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
               Clave (opcional)
               <input
                 value={editClave}
@@ -622,7 +622,7 @@ export default function UsersView() {
             </label>
           </div>
           <div className="row">
-            <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
+            <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
               Docente ID
               <input
                 value={editDocenteId}
