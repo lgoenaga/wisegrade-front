@@ -431,17 +431,18 @@ export default function UsersView() {
   }
 
   return (
-    <div
-      className="stack"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'auto 1fr',
-        columnGap: 12,
-        rowGap: 8,
-        alignItems: 'start',
-      }}
-    >
-      <h2 style={{ margin: 0, textAlign: 'left', paddingTop: 6, gridColumn: 1 }}>Usuarios</h2>
+    <div className="usersContainer">
+      <div
+        className="stack"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr',
+          columnGap: 12,
+          rowGap: 8,
+          alignItems: 'start',
+        }}
+      >
+        <h2 style={{ margin: 0, textAlign: 'left', paddingTop: 6, gridColumn: 1 }}>Usuarios</h2>
 
       <form onSubmit={onCreate} className="card" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Crear</h3>
@@ -679,6 +680,7 @@ export default function UsersView() {
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   )
 }
