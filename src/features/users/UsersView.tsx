@@ -91,6 +91,7 @@ function EstudianteCombobox({
     [estudiantes, selectedId],
   )
   const dropdownRef = useRef<HTMLDivElement | null>(null)
+  const lastSelectedIdRef = useRef<number | null>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
@@ -100,12 +101,22 @@ function EstudianteCombobox({
   }, [estudiantes, query])
 
   useEffect(() => {
-    if (selected && query.trim() === '') {
-      setQuery(formatEstudianteLabel(selected))
+    // Keep field text synced when selection changes from outside.
+    // If the dropdown is open, user is typing/searching; don't override.
+    if (open) return
+
+    if (lastSelectedIdRef.current === selectedId) return
+    lastSelectedIdRef.current = selectedId
+
+    if (selectedId == null) {
+      setQuery('')
+      return
     }
 
-    // Keep field text synced when a selection is set from outside.
-  }, [selected, query])
+    if (selected) {
+      setQuery(formatEstudianteLabel(selected))
+    }
+  }, [open, selected, selectedId])
 
   useEffect(() => {
     if (resetKey == null) return
