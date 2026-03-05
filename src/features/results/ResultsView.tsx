@@ -266,6 +266,8 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [data, setData] = useState<ExamenResultadosResponse | null>(null)
 
   const [deletingIntentoId, setDeletingIntentoId] = useState<number | null>(null)
+  const [reopeningIntentoId, setReopeningIntentoId] = useState<number | null>(null)
+  const [forceSubmittingIntentoId, setForceSubmittingIntentoId] = useState<number | null>(null)
 
   const [confirmDelete, setConfirmDelete] = useState<{
     intentoId: number
@@ -557,7 +559,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
           .filter((d) => d),
       )
 
-      let received = estudiantes.length
+      const received = estudiantes.length
       let added = 0
       let skipped = 0
       let errors = 0
@@ -640,11 +642,84 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     }
   }
 
+  async function handleReopenIntento(params: {
+    intentoId: number
+    estudianteNombre: string
+    documento: string
+    reopenCount: number | null
+  }) {
+    const { intentoId, estudianteNombre, documento, reopenCount } = params
+    if (!intentoId || busy) return
+    if (reopeningIntentoId != null || deletingIntentoId != null || forceSubmittingIntentoId != null) return
+
+    const already = (reopenCount ?? 0) >= 1
+    if (already) {
+      setToast({ kind: 'error', message: `Intento ${intentoId} ya fue reabierto previamente.` })
+      return
+    }
+
+    const raw = window.prompt(
+      `Reabrir intento ${intentoId} (${documento} — ${estudianteNombre}).\nMinutos extra a agregar (solo una vez):`,
+      '5',
+    )
+    if (raw == null) return
+    const extraMinutes = toPositiveInt(raw)
+    if (!extraMinutes) {
+      setToast({ kind: 'error', message: 'Minutos extra inválidos (debe ser un entero > 0).' })
+      return
+    }
+
+    setReopeningIntentoId(intentoId)
+    setError(null)
+    setToast(null)
+
+    try {
+      await apiPostJson(`/intentos/${intentoId}/reabrir`, { extraMinutes })
+      await handleQuery()
+      setToast({ kind: 'success', message: `Intento ${intentoId} reabierto (+${extraMinutes} min).` })
+    } catch (e: unknown) {
+      const msg = extractErrorMessage(e, 'No se pudo reabrir el intento')
+      setToast({ kind: 'error', message: `Reabrir falló: ${msg}` })
+    } finally {
+      setReopeningIntentoId(null)
+    }
+  }
+
+  async function handleForceSubmitIntento(params: {
+    intentoId: number
+    estudianteNombre: string
+    documento: string
+  }) {
+    const { intentoId, estudianteNombre, documento } = params
+    if (!intentoId || busy) return
+    if (forceSubmittingIntentoId != null || deletingIntentoId != null || reopeningIntentoId != null) return
+
+    const ok = window.confirm(
+      `Forzar envío definitivo del intento ${intentoId} (${documento} — ${estudianteNombre})?\nEsta acción no permite reabrir luego.`,
+    )
+    if (!ok) return
+
+    setForceSubmittingIntentoId(intentoId)
+    setError(null)
+    setToast(null)
+
+    try {
+      await apiPostJson(`/intentos/${intentoId}/force-submit`, {})
+      await handleQuery()
+      setToast({ kind: 'success', message: `Intento ${intentoId} enviado definitivamente.` })
+    } catch (e: unknown) {
+      const msg = extractErrorMessage(e, 'No se pudo forzar el envío')
+      setToast({ kind: 'error', message: `Forzar envío falló: ${msg}` })
+    } finally {
+      setForceSubmittingIntentoId(null)
+    }
+  }
+
   const filas = useMemo(() => {
     const all = data?.filas ?? []
     if (estadoFiltro === 'TODOS') return all
     if (estadoFiltro === 'ENVIADOS') return all.filter((f) => f.estado === 'SUBMITTED')
-    return all.filter((f) => f.estado === 'IN_PROGRESS')
+    return all.filter((f) => f.estado === 'IN_PROGRESS' || f.estado === 'BLOCKED')
   }, [data, estadoFiltro])
   const totalPages = useMemo(() => {
     const n = Math.ceil(filas.length / pageSize)
@@ -945,7 +1020,12 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     const canDelete =
                       (rol === 'ADMIN') ||
                       (rol === 'DOCENTE' && f.estado !== 'SUBMITTED')
+                    const canReopen = (rol === 'ADMIN' || rol === 'DOCENTE') && f.estado === 'BLOCKED' && (f.reopenCount ?? 0) < 1
+                    const canForceSubmit = (rol === 'ADMIN' || rol === 'DOCENTE') && f.estado === 'BLOCKED'
                     const isDeleting = deletingIntentoId === f.intentoId
+                    const isReopening = reopeningIntentoId === f.intentoId
+                    const isForceSubmitting = forceSubmittingIntentoId === f.intentoId
+                    const anyRowBusy = busy || deletingIntentoId != null || reopeningIntentoId != null || forceSubmittingIntentoId != null
                     return (
                       <tr key={f.intentoId}>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
@@ -979,26 +1059,63 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                           {f.intentoId}
                         </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
-                          {canDelete ? (
-                            <button
-                              type="button"
-                              className="btnSecondary headerBtn"
-                              disabled={busy || deletingIntentoId != null}
-                              onClick={() =>
-                                handleDeleteIntento({
-                                  intentoId: f.intentoId,
-                                  estado: f.estado,
-                                  estudianteNombre,
-                                  documento: est.documento,
-                                })
-                              }
-                              title={f.estado === 'SUBMITTED' ? 'Solo ADMIN puede eliminar SUBMITTED' : 'Eliminar intento'}
-                            >
-                              {isDeleting ? 'Eliminando…' : 'Eliminar'}
-                            </button>
-                          ) : (
-                            ''
-                          )}
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {canReopen ? (
+                              <button
+                                type="button"
+                                className="btnSecondary headerBtn"
+                                disabled={anyRowBusy}
+                                onClick={() =>
+                                  void handleReopenIntento({
+                                    intentoId: f.intentoId,
+                                    estudianteNombre,
+                                    documento: est.documento,
+                                    reopenCount: f.reopenCount ?? 0,
+                                  })
+                                }
+                                title="Reabrir una sola vez con minutos extra"
+                              >
+                                {isReopening ? 'Reabriendo…' : 'Reabrir'}
+                              </button>
+                            ) : null}
+
+                            {canForceSubmit ? (
+                              <button
+                                type="button"
+                                className="btnSecondary headerBtn"
+                                disabled={anyRowBusy}
+                                onClick={() =>
+                                  void handleForceSubmitIntento({
+                                    intentoId: f.intentoId,
+                                    estudianteNombre,
+                                    documento: est.documento,
+                                  })
+                                }
+                                title="Forzar envío definitivo (solo BLOQUEADO)"
+                              >
+                                {isForceSubmitting ? 'Enviando…' : 'Forzar envío'}
+                              </button>
+                            ) : null}
+
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                className="btnSecondary headerBtn"
+                                disabled={anyRowBusy}
+                                onClick={() =>
+                                  handleDeleteIntento({
+                                    intentoId: f.intentoId,
+                                    estado: f.estado,
+                                    estudianteNombre,
+                                    documento: est.documento,
+                                  })
+                                }
+                                title={f.estado === 'SUBMITTED' ? 'Solo ADMIN puede eliminar SUBMITTED' : 'Eliminar intento'}
+                              >
+                                {isDeleting ? 'Eliminando…' : 'Eliminar'}
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     )

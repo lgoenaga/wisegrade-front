@@ -71,6 +71,14 @@ function matchesEstudiante(e: EstudianteResponse, query: string): boolean {
   )
 }
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (!err || typeof err !== 'object') return fallback
+  const msg = (err as Record<string, unknown>).message
+  if (typeof msg === 'string' && msg.trim()) return msg
+  if (msg == null) return fallback
+  return String(msg)
+}
+
 function EstudianteCombobox({
   disabled,
   required,
@@ -100,6 +108,8 @@ function EstudianteCombobox({
     return base.slice(0, 25)
   }, [estudiantes, query])
 
+  /* eslint-disable react-hooks/set-state-in-effect */
+
   useEffect(() => {
     // Keep field text synced when selection changes from outside.
     // If the dropdown is open, user is typing/searching; don't override.
@@ -128,6 +138,8 @@ function EstudianteCombobox({
     if (!disabled) return
     setOpen(false)
   }, [disabled])
+
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return (
     <label className="formField" style={{ position: 'relative', minWidth: 320 }}>
@@ -252,7 +264,7 @@ export default function UsersView() {
       const data = await apiGetJson<AuthUserResponse[]>('/auth/users')
       setUsers(data)
     } catch (e) {
-      const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
+      const message = extractErrorMessage(e, 'Error')
       setError(message)
     } finally {
       setLoading(false)
@@ -280,7 +292,7 @@ export default function UsersView() {
         if (cancelled) return
         setEstudiantes(Array.isArray(data) ? data : [])
       } catch (e) {
-        const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
+        const message = extractErrorMessage(e, 'Error')
         if (cancelled) return
         setEstudiantes([])
         setEstudiantesError(message)
@@ -363,7 +375,7 @@ export default function UsersView() {
       setToast({ kind: 'success', message: 'Usuario creado' })
       await refresh()
     } catch (e) {
-      const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
+      const message = extractErrorMessage(e, 'Error')
       setError(message)
       setToast({ kind: 'error', message })
       setLoading(false)
@@ -406,7 +418,7 @@ export default function UsersView() {
       setSelectedId(selected.id)
       setToast({ kind: 'success', message: 'Usuario actualizado' })
     } catch (e) {
-      const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
+      const message = extractErrorMessage(e, 'Error')
       setError(message)
       setToast({ kind: 'error', message })
       setLoading(false)
@@ -424,7 +436,7 @@ export default function UsersView() {
       if (selectedId === user.id) setSelectedId(null)
       await refresh()
     } catch (e) {
-      const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
+      const message = extractErrorMessage(e, 'Error')
       setError(message)
       setLoading(false)
     }

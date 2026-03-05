@@ -6,6 +6,10 @@ import type {
   IntentoEnviarRequest,
   IntentoEnviarResponse,
   IntentoDetalleResponse,
+  IntentoGuardarRequest,
+  IntentoGuardarResponse,
+  IntentoBlockRequest,
+  IntentoBlockResponse,
   IntentoSnapshot,
   PreguntaGeneratedResponse,
   CorreccionPreguntaResponse,
@@ -47,14 +51,22 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 }
 
 export function ExamAttemptView({ intento, onSubmitted }: Props) {
+  const startedAt = intento.startedAt
+  const deadlineAt = (intento as { deadlineAt?: string | null }).deadlineAt ?? null
+
   const durationMinutes = useMemo(
     () => assertFinitePositive(EXAM_DURATION_MINUTES, 'VITE_EXAM_DURATION_MINUTES'),
     [],
   )
   const deadlineMs = useMemo(() => {
-    const startedMs = new Date(intento.startedAt).getTime()
+    const deadlineFromServerMs = deadlineAt ? new Date(deadlineAt).getTime() : NaN
+    if (Number.isFinite(deadlineFromServerMs)) {
+      return deadlineFromServerMs
+    }
+
+    const startedMs = new Date(startedAt).getTime()
     return startedMs + durationMinutes * 60_000
-  }, [intento.startedAt, durationMinutes])
+  }, [startedAt, deadlineAt, durationMinutes])
 
   const [answersByPreguntaId, setAnswersByPreguntaId] = useState<Record<string, RespuestaCorrecta>>({})
   const [pendingSubmit, setPendingSubmit] = useState(false)
@@ -76,8 +88,10 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const lastWarnAtRef = useRef<number>(0)
   const lastWarnKeyRef = useRef<string>('')
   const hadFullscreenRef = useRef<boolean>(false)
-  const autoSubmitTriggeredRef = useRef<boolean>(false)
+  const blockReportedRef = useRef<boolean>(false)
   const timeAutoSubmitTriggeredRef = useRef<boolean>(false)
+
+  const serverSaveTimerRef = useRef<number | null>(null)
 
   const navInitializedRef = useRef<boolean>(false)
 
@@ -90,25 +104,27 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     navInitializedRef.current = false
     setError(null)
     timeAutoSubmitTriggeredRef.current = false
+    blockReportedRef.current = false
     const draft = loadAttemptDraft(intento.intentoId)
     setAttemptMeta(draft?.meta ?? null)
     const serverAnswers = answersFromServer('respuestas' in intento ? intento.respuestas : undefined)
     const hasServerAnswers = Object.keys(serverAnswers).length > 0
     const hasServerSnapshot = 'respuestas' in intento
     const shouldTrustServer = hasServerSnapshot && (intento.estado === 'SUBMITTED' || hasServerAnswers)
+    const serverBlocked = intento.estado === 'BLOCKED'
 
     if (shouldTrustServer) {
       setAnswersByPreguntaId(serverAnswers)
       setPendingSubmit(false)
       setAntiCheatWarnings(Number.isFinite(draft?.antiCheatWarnings) ? (draft?.antiCheatWarnings as number) : 0)
-      setBlocked(Boolean(draft?.blocked))
+      setBlocked(serverBlocked)
       saveAttemptDraft({
         intentoSnapshot: intento,
         meta: draft?.meta,
         answersByPreguntaId: serverAnswers,
         pendingSubmit: false,
         antiCheatWarnings: Number.isFinite(draft?.antiCheatWarnings) ? (draft?.antiCheatWarnings as number) : 0,
-        blocked: draft?.blocked ?? false,
+        blocked: serverBlocked,
       })
       setHydrated(true)
       return
@@ -118,7 +134,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       setAnswersByPreguntaId(draft.answersByPreguntaId ?? {})
       setPendingSubmit(Boolean(draft.pendingSubmit))
       setAntiCheatWarnings(Number.isFinite(draft.antiCheatWarnings) ? draft.antiCheatWarnings : 0)
-      setBlocked(Boolean(draft.blocked))
+      setBlocked(serverBlocked)
       setHydrated(true)
       return
     }
@@ -128,7 +144,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       answersByPreguntaId: {},
       pendingSubmit: false,
       antiCheatWarnings: 0,
-      blocked: false,
+      blocked: serverBlocked,
     })
     setHydrated(true)
   }, [intento])
@@ -162,6 +178,8 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   }, [intento.estado])
 
   const isSubmitted = submitOk || intento.estado === 'SUBMITTED'
+  const isServerBlocked = intento.estado === 'BLOCKED'
+  const isBlocked = blocked || isServerBlocked
 
   async function handleExportPdf() {
     if (!isSubmitted) return
@@ -280,9 +298,6 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       if (res.estado === 'SUBMITTED') {
         setSubmitOk(true)
         setPendingSubmit(false)
-        if (autoSubmitTriggeredRef.current || blocked) {
-          setAntiCheatNote('Intento enviado automáticamente por antitrampa. No se puede presentar nuevamente.')
-        }
         onSubmitted(intento.intentoId)
       } else {
         setPendingSubmit(true)
@@ -297,7 +312,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
 
   function warnAntiCheat(reason: string, key: string = 'generic') {
     if (submitOk) return
-    if (blocked) {
+    if (isBlocked) {
       setAntiCheatNote(`${reason}. Examen ya estaba bloqueado.`)
       return
     }
@@ -409,16 +424,74 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitOk, blocked])
 
-  // auto-submit when blocked
+  // When blocked (anti-cheat), persist answers and notify backend. Do NOT auto-submit.
   useEffect(() => {
-    if (!blocked || submitOk) return
-    if (autoSubmitTriggeredRef.current) return
-    autoSubmitTriggeredRef.current = true
-    setPendingSubmit(true)
-    setAntiCheatNote('Examen bloqueado por múltiples advertencias. Enviando automáticamente…')
-    void trySubmit(true)
+    if (!blocked) return
+    if (submitOk) return
+    if (blockReportedRef.current) return
+    blockReportedRef.current = true
+
+    const respuestas = intento.preguntas
+      .map((p) => {
+        const r = answersByPreguntaId[String(p.id)]
+        return r ? { preguntaId: p.id, respuesta: r } : null
+      })
+      .filter(Boolean) as Array<{ preguntaId: number; respuesta: RespuestaCorrecta }>
+
+    const savePayload: IntentoGuardarRequest = { respuestas }
+    const blockPayload: IntentoBlockRequest = { reason: 'anticheat: warnings>=3' }
+
+    ;(async () => {
+      try {
+        await apiPostJson<IntentoGuardarResponse>(`/intentos/${intento.intentoId}/guardar`, savePayload)
+      } catch {
+        // Best-effort: blocking should still occur even if save fails.
+      }
+
+      try {
+        await apiPostJson<IntentoBlockResponse>(`/intentos/${intento.intentoId}/anticheat/block`, blockPayload)
+      } catch {
+        // Ignore.
+      }
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocked, submitOk])
+  }, [blocked, submitOk, intento.intentoId])
+
+  // Best-effort server-side partial save while answering.
+  useEffect(() => {
+    if (!hydrated) return
+    if (submitOk) return
+    if (pendingSubmit) return
+    if (isBlocked) return
+
+    if (serverSaveTimerRef.current != null) {
+      window.clearTimeout(serverSaveTimerRef.current)
+      serverSaveTimerRef.current = null
+    }
+
+    serverSaveTimerRef.current = window.setTimeout(() => {
+      const respuestas = intento.preguntas
+        .map((p) => {
+          const r = answersByPreguntaId[String(p.id)]
+          return r ? { preguntaId: p.id, respuesta: r } : null
+        })
+        .filter(Boolean) as Array<{ preguntaId: number; respuesta: RespuestaCorrecta }>
+
+      const payload: IntentoGuardarRequest = { respuestas }
+      void apiPostJson<IntentoGuardarResponse>(`/intentos/${intento.intentoId}/guardar`, payload).catch(() => {
+        // Silent: local draft is still the primary buffer.
+      })
+
+      serverSaveTimerRef.current = null
+    }, 900)
+
+    return () => {
+      if (serverSaveTimerRef.current != null) {
+        window.clearTimeout(serverSaveTimerRef.current)
+        serverSaveTimerRef.current = null
+      }
+    }
+  }, [answersByPreguntaId, hydrated, intento.intentoId, intento.preguntas, isBlocked, pendingSubmit, submitOk])
 
   // auto-retry when pending
   useEffect(() => {
@@ -448,13 +521,14 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     if (submitOk) return
     if (submitting) return
     if (pendingSubmit) return
+    if (isBlocked) return
     if (timeAutoSubmitTriggeredRef.current) return
     timeAutoSubmitTriggeredRef.current = true
 
     setPendingSubmit(true)
     void trySubmit(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTimeUp, submitOk, submitting, pendingSubmit])
+  }, [isTimeUp, submitOk, submitting, pendingSubmit, isBlocked])
 
   const answeredCount = intento.preguntas.reduce((acc, p) => {
     return answersByPreguntaId[String(p.id)] ? acc + 1 : acc
@@ -470,12 +544,26 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     !submitting &&
     !pendingSubmit &&
     intento.preguntas.length > 0 &&
+    !isBlocked &&
     (missingCount === 0 || isTimeUp)
 
   const totalPreguntas = intento.preguntas.length
   const currentPregunta = totalPreguntas > 0 ? intento.preguntas[currentIdx] : null
   const selected = currentPregunta ? answersByPreguntaId[String(currentPregunta.id)] : undefined
   const corr = currentPregunta && isSubmitted ? correccionByPreguntaId.get(currentPregunta.id) : undefined
+
+  if (isBlocked && !isSubmitted) {
+    return (
+      <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
+        <div className="card" style={{ padding: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Examen bloqueado</h2>
+          <p style={{ marginTop: 8, marginBottom: 0, fontSize: 14 }}>
+            Este intento fue bloqueado por antitrampa. Contacta al docente para que lo reabra o lo envíe.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
@@ -533,8 +621,8 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
 
       {!submitOk ? (
         <div style={{ marginTop: 4, opacity: 0.8, fontSize: 13 }}>
-          Antitrampa: <strong>{blocked ? 'BLOQUEADO' : `${antiCheatWarnings}/3`}</strong>
-          {antiCheatWarnings > 0 && !blocked ? <span> · Al llegar a 3 se bloquea</span> : null}
+          Antitrampa: <strong>{isBlocked ? 'BLOQUEADO' : `${antiCheatWarnings}/3`}</strong>
+          {antiCheatWarnings > 0 && !isBlocked ? <span> · Al llegar a 3 se bloquea</span> : null}
         </div>
       ) : null}
 
@@ -562,7 +650,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </p>
       ) : null}
 
-      {!submitOk && !blocked ? (
+      {!submitOk && !isBlocked ? (
         <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             className="examBtn"
@@ -622,7 +710,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
                     name={`p-${currentPregunta.id}`}
                     checked={selected === o.key}
                     onChange={() => setAnswer(currentPregunta.id, o.key)}
-                    disabled={submitOk || isTimeUp || blocked}
+                    disabled={submitOk || isTimeUp || isBlocked}
                     style={{ marginTop: 4 }}
                   />
                   <span>
