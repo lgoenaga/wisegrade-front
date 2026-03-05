@@ -37,7 +37,7 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
   const [momentoId, setMomentoId] = useState('')
   const [docenteResponsableId, setDocenteResponsableId] = useState('')
   const [estudianteIdInput, setEstudianteIdInput] = useState('')
-  const [cantidad, setCantidad] = useState('10')
+  const [cantidad, setCantidad] = useState('30')
 
   const [docenteQuery, setDocenteQuery] = useState('')
   const [estudianteQuery, setEstudianteQuery] = useState('')
@@ -290,7 +290,7 @@ export function StartAttemptForm({ onStart, busy, error, lockedEstudiante }: Pro
           <div className="field">
             <label>Cantidad de preguntas</label>
             <select value={cantidad} onChange={(e) => setCantidad(e.target.value)}>
-              {[10, 15, 20, 30].map((n) => (
+              {[10, 15, 20, 25, 30].map((n) => (
                 <option key={n} value={String(n)}>
                   {n}
                 </option>
