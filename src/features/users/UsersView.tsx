@@ -550,7 +550,7 @@ export default function UsersView() {
                 <th style={{ textAlign: 'right' }}>Acciones</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody style={{ fontSize: '0.92rem', fontWeight: 500, fontFamily: 'inherit' }}>
               {filteredUsers.map((u) => (
                 <tr key={u.id} style={{ borderTop: '1px solid rgba(0,0,0,0.1)' }}>
                   <td>{u.id}</td>
@@ -558,7 +558,14 @@ export default function UsersView() {
                     <button
                       type="button"
                       onClick={() => setSelectedId(u.id)}
-                      style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        color: 'inherit',
+                      }}
                       title="Editar"
                     >
                       {u.documento}
