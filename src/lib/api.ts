@@ -120,6 +120,30 @@ export async function apiDelete(path: string, signal?: AbortSignal): Promise<voi
   }
 }
 
+export async function apiPutJson<TResponse>(
+  path: string,
+  body: unknown,
+  signal?: AbortSignal,
+): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  })
+
+  if (!response.ok) {
+    const raw = await readJsonSafe(response)
+    const message = extractMessage(raw, `HTTP ${response.status}`)
+
+    const err: ApiError = { status: response.status, message, raw }
+    throw err
+  }
+
+  return (await readJsonSafe(response)) as TResponse
+}
+
 export async function apiPut(path: string, signal?: AbortSignal): Promise<void> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PUT',
