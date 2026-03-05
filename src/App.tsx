@@ -6,6 +6,7 @@ import type { AuthMeResponse, UserRole } from './features/auth/types'
 import { StartAttemptForm } from './features/exam/StartAttemptForm'
 import { ExamAttemptView } from './features/exam/ExamAttemptView'
 import { ResultsView } from './features/results/ResultsView'
+import UsersView from './features/users/UsersView'
 import cesdeLogo from './assets/logo-Cesde-2023.svg'
 import type {
   IntentoDetalleResponse,
@@ -347,6 +348,8 @@ function App() {
             error={error}
             lockedEstudiante={me.estudiante}
           />
+        ) : me.rol === 'ADMIN' && screen === 'users' ? (
+          <UsersView />
         ) : screen === 'results' ? (
           <ResultsView rol="ADMIN" />
         ) : (

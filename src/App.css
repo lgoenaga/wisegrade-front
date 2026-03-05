@@ -171,6 +171,14 @@
   color: var(--wg-muted);
 }
 
+.error {
+  border: 1px solid var(--wg-primary);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--wg-surface);
+  color: var(--wg-text);
+}
+
 .formGrid {
   display: grid;
   gap: 6px;
