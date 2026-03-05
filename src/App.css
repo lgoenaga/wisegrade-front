@@ -165,6 +165,11 @@
   padding: 10px;
 }
 
+/* Slightly tighter padding for the Users page cards */
+.usersCard {
+  padding: 8px 10px;
+}
+
 .stack {
   display: grid;
   gap: 8px;

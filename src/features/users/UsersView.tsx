@@ -438,13 +438,13 @@ export default function UsersView() {
           display: 'grid',
           gridTemplateColumns: 'auto 1fr',
           columnGap: 12,
-          rowGap: 8,
+          rowGap: 6,
           alignItems: 'start',
         }}
       >
         <h2 style={{ margin: 0, textAlign: 'left', paddingTop: 6, gridColumn: 1 }}>Usuarios</h2>
 
-      <form onSubmit={onCreate} className="card" style={{ gridColumn: 2 }}>
+      <form onSubmit={onCreate} className="card usersCard" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Crear</h3>
         <div className="row rowNoWrapWide">
           <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
@@ -504,7 +504,7 @@ export default function UsersView() {
         <div style={{ gridColumn: 2 }} />
       )}
 
-      <div className="card" style={{ gridColumn: 2 }}>
+      <div className="card usersCard" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Lista</h3>
         <div
           style={{
@@ -592,7 +592,7 @@ export default function UsersView() {
       ) : null}
 
       {selected ? (
-        <form onSubmit={onUpdate} className="card" style={{ gridColumn: 2 }}>
+        <form onSubmit={onUpdate} className="card usersCard" style={{ gridColumn: 2 }}>
           <h3 style={{ margin: 0 }}>Editar #{selected.id}</h3>
           <div className="row rowNoWrapWide">
             <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
