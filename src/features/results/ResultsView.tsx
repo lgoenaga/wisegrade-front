@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiDelete, apiGetJson, apiPostJson, apiPut } from '../../lib/api'
+import { ToastHost, type ToastState } from '../../components/ToastHost'
 import type { ExamenResultadosResponse } from './types'
 
 type Periodo = { id: number; anio: number; nombre: string }
@@ -226,7 +227,7 @@ type Props = {
   rol?: 'ADMIN' | 'DOCENTE'
 }
 
-type EstadoIntentoFiltro = 'TODOS' | 'ENVIADOS' | 'EN_PROGRESO'
+type EstadoIntentoFiltro = 'TODOS' | 'ENVIADOS' | 'EN_PROGRESO' | 'BLOQUEADOS'
 
 export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [periodoId, setPeriodoId] = useState('')
@@ -262,7 +263,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const [toast, setToast] = useState<ToastState | null>(null)
   const [data, setData] = useState<ExamenResultadosResponse | null>(null)
 
   const [deletingIntentoId, setDeletingIntentoId] = useState<number | null>(null)
@@ -278,6 +279,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
   useEffect(() => {
     if (!toast) return
+    if (toast.kind === 'confirm' || toast.kind === 'promptNumber') return
     const t = window.setTimeout(() => setToast(null), 5000)
     return () => window.clearTimeout(t)
   }, [toast])
@@ -402,13 +404,14 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     setError(null)
 
     try {
-      const includeInProgress = estadoFiltro !== 'ENVIADOS'
       const qs = new URLSearchParams({
         periodoId: String(parsed.periodoId),
         materiaId: String(parsed.materiaId),
         momentoId: String(parsed.momentoId),
         docenteResponsableId: String(parsed.docenteResponsableId),
-        includeInProgress: includeInProgress ? 'true' : 'false',
+        // Always include in-progress rows so the UI can filter by status client-side
+        // (e.g., switching between ENVIADOS/BLOQUEADOS without re-querying).
+        includeInProgress: 'true',
       })
 
       const res = await apiGetJson<ExamenResultadosResponse>(`/examenes/resultados?${qs.toString()}`)
@@ -658,31 +661,39 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
       return
     }
 
-    const raw = window.prompt(
-      `Reabrir intento ${intentoId} (${documento} — ${estudianteNombre}).\nMinutos extra a agregar (solo una vez):`,
-      '5',
-    )
-    if (raw == null) return
-    const extraMinutes = toPositiveInt(raw)
-    if (!extraMinutes) {
-      setToast({ kind: 'error', message: 'Minutos extra inválidos (debe ser un entero > 0).' })
-      return
-    }
+    setToast({
+      kind: 'promptNumber',
+      title: `Reabrir intento ${intentoId}`,
+      message: `${documento} — ${estudianteNombre}.\nMinutos extra a agregar (solo una vez):`,
+      inputLabel: 'Minutos extra',
+      value: '5',
+      min: 1,
+      placeholder: 'Ej: 5',
+      confirmText: 'Reabrir',
+      cancelText: 'Cancelar',
+      busy: false,
+      error: null,
+      onCancel: () => setToast(null),
+      onConfirm: async (extraMinutes) => {
+        setReopeningIntentoId(intentoId)
+        setError(null)
+        setToast((prev) => {
+          if (!prev || prev.kind !== 'promptNumber') return prev
+          return { ...prev, busy: true, error: null }
+        })
 
-    setReopeningIntentoId(intentoId)
-    setError(null)
-    setToast(null)
-
-    try {
-      await apiPostJson(`/intentos/${intentoId}/reabrir`, { extraMinutes })
-      await handleQuery()
-      setToast({ kind: 'success', message: `Intento ${intentoId} reabierto (+${extraMinutes} min).` })
-    } catch (e: unknown) {
-      const msg = extractErrorMessage(e, 'No se pudo reabrir el intento')
-      setToast({ kind: 'error', message: `Reabrir falló: ${msg}` })
-    } finally {
-      setReopeningIntentoId(null)
-    }
+        try {
+          await apiPostJson(`/intentos/${intentoId}/reabrir`, { extraMinutes })
+          await handleQuery()
+          setToast({ kind: 'success', message: `Intento ${intentoId} reabierto (+${extraMinutes} min).` })
+        } catch (e: unknown) {
+          const msg = extractErrorMessage(e, 'No se pudo reabrir el intento')
+          setToast({ kind: 'error', message: `Reabrir falló: ${msg}` })
+        } finally {
+          setReopeningIntentoId(null)
+        }
+      },
+    })
   }
 
   async function handleForceSubmitIntento(params: {
@@ -694,32 +705,42 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     if (!intentoId || busy) return
     if (forceSubmittingIntentoId != null || deletingIntentoId != null || reopeningIntentoId != null) return
 
-    const ok = window.confirm(
-      `Forzar envío definitivo del intento ${intentoId} (${documento} — ${estudianteNombre})?\nEsta acción no permite reabrir luego.`,
-    )
-    if (!ok) return
+    setToast({
+      kind: 'confirm',
+      title: 'Forzar envío definitivo',
+      message: `Forzar envío definitivo del intento ${intentoId} (${documento} — ${estudianteNombre})?\nEsta acción no permite reabrir luego.`,
+      confirmText: 'Forzar envío',
+      cancelText: 'Cancelar',
+      busy: false,
+      onCancel: () => setToast(null),
+      onConfirm: async () => {
+        setForceSubmittingIntentoId(intentoId)
+        setError(null)
+        setToast((prev) => {
+          if (!prev || prev.kind !== 'confirm') return prev
+          return { ...prev, busy: true }
+        })
 
-    setForceSubmittingIntentoId(intentoId)
-    setError(null)
-    setToast(null)
-
-    try {
-      await apiPostJson(`/intentos/${intentoId}/force-submit`, {})
-      await handleQuery()
-      setToast({ kind: 'success', message: `Intento ${intentoId} enviado definitivamente.` })
-    } catch (e: unknown) {
-      const msg = extractErrorMessage(e, 'No se pudo forzar el envío')
-      setToast({ kind: 'error', message: `Forzar envío falló: ${msg}` })
-    } finally {
-      setForceSubmittingIntentoId(null)
-    }
+        try {
+          await apiPostJson(`/intentos/${intentoId}/force-submit`, {})
+          await handleQuery()
+          setToast({ kind: 'success', message: `Intento ${intentoId} enviado definitivamente.` })
+        } catch (e: unknown) {
+          const msg = extractErrorMessage(e, 'No se pudo forzar el envío')
+          setToast({ kind: 'error', message: `Forzar envío falló: ${msg}` })
+        } finally {
+          setForceSubmittingIntentoId(null)
+        }
+      },
+    })
   }
 
   const filas = useMemo(() => {
     const all = data?.filas ?? []
     if (estadoFiltro === 'TODOS') return all
     if (estadoFiltro === 'ENVIADOS') return all.filter((f) => f.estado === 'SUBMITTED')
-    return all.filter((f) => f.estado === 'IN_PROGRESS' || f.estado === 'BLOCKED')
+    if (estadoFiltro === 'BLOQUEADOS') return all.filter((f) => f.estado === 'BLOCKED')
+    return all.filter((f) => f.estado === 'IN_PROGRESS')
   }, [data, estadoFiltro])
   const totalPages = useMemo(() => {
     const n = Math.ceil(filas.length / pageSize)
@@ -830,6 +851,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
               <option value="TODOS">Todos</option>
               <option value="ENVIADOS">Enviados</option>
               <option value="EN_PROGRESO">En progreso</option>
+              <option value="BLOQUEADOS">Bloqueados</option>
             </select>
           </div>
 
@@ -1133,38 +1155,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
         ) : null}
       </div>
 
-      {toast ? (
-        <div
-          style={{
-            position: 'fixed',
-            right: 16,
-            bottom: 16,
-            zIndex: 1000,
-            width: 'min(520px, calc(100vw - 32px))',
-          }}
-          aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
-        >
-          <div className="card" style={{ padding: 10 }}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <div>
-                <div style={{ fontWeight: 800, marginBottom: 2 }}>
-                  {toast.kind === 'success' ? 'Éxito' : 'Error'}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--wg-text)' }}>{toast.message}</div>
-              </div>
-              <button
-                type="button"
-                className="btnSecondary headerBtn"
-                onClick={() => setToast(null)}
-                disabled={deletingIntentoId != null}
-                title="Cerrar"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ToastHost toast={toast} setToast={setToast} disabled={busy || deletingIntentoId != null} />
 
       {confirmDelete ? (
         <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} role="dialog" aria-modal="true">

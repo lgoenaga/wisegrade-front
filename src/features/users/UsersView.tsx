@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 import { apiDelete, apiGetJson, apiPostJson, apiPutJson } from '../../lib/api'
+import { ToastHost, type ToastState } from '../../components/ToastHost'
 import type { UserRole } from '../auth/types'
 
 type AuthUserResponse = {
@@ -225,7 +226,7 @@ function EstudianteCombobox({
 export default function UsersView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const [toast, setToast] = useState<ToastState | null>(null)
   const [users, setUsers] = useState<AuthUserResponse[]>([])
 
   const [documentFilter, setDocumentFilter] = useState('')
@@ -277,6 +278,7 @@ export default function UsersView() {
 
   useEffect(() => {
     if (!toast) return
+    if (toast.kind === 'confirm' || toast.kind === 'promptNumber') return
     const t = window.setTimeout(() => setToast(null), 5000)
     return () => window.clearTimeout(t)
   }, [toast])
@@ -426,20 +428,38 @@ export default function UsersView() {
   }
 
   async function onDelete(user: AuthUserResponse) {
-    const ok = window.confirm(`Eliminar usuario ${user.documento}?`)
-    if (!ok) return
+    if (loading) return
 
-    setLoading(true)
-    setError(null)
-    try {
-      await apiDelete(`/auth/users/${user.id}`)
-      if (selectedId === user.id) setSelectedId(null)
-      await refresh()
-    } catch (e) {
-      const message = extractErrorMessage(e, 'Error')
-      setError(message)
-      setLoading(false)
-    }
+    setToast({
+      kind: 'confirm',
+      title: 'Confirmar eliminación',
+      message: `Eliminar usuario ${user.documento}?`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      busy: false,
+      onCancel: () => setToast(null),
+      onConfirm: async () => {
+        setLoading(true)
+        setError(null)
+        setToast((prev) => {
+          if (!prev || prev.kind !== 'confirm') return prev
+          return { ...prev, busy: true }
+        })
+
+        try {
+          await apiDelete(`/auth/users/${user.id}`)
+          if (selectedId === user.id) setSelectedId(null)
+          await refresh()
+          setToast({ kind: 'success', message: 'Usuario eliminado' })
+        } catch (e) {
+          const message = extractErrorMessage(e, 'Error')
+          setError(message)
+          setToast({ kind: 'error', message })
+        } finally {
+          setLoading(false)
+        }
+      },
+    })
   }
 
   return (
@@ -671,36 +691,7 @@ export default function UsersView() {
         </form>
       ) : null}
 
-      {toast ? (
-        <div
-          style={{
-            position: 'fixed',
-            right: 16,
-            bottom: 16,
-            zIndex: 1000,
-            width: 'min(520px, calc(100vw - 32px))',
-          }}
-          aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
-        >
-          <div className="card" style={{ padding: 10 }}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <div>
-                <div style={{ fontWeight: 800, marginBottom: 2 }}>{toast.kind === 'success' ? 'Éxito' : 'Error'}</div>
-                <div style={{ fontSize: 13, color: 'var(--wg-text)' }}>{toast.message}</div>
-              </div>
-              <button
-                type="button"
-                className="btnSecondary headerBtn"
-                onClick={() => setToast(null)}
-                disabled={loading}
-                title="Cerrar"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ToastHost toast={toast} setToast={setToast} disabled={loading} />
       </div>
     </div>
   )
