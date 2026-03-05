@@ -447,11 +447,11 @@ export default function UsersView() {
       <form onSubmit={onCreate} className="card" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Crear</h3>
         <div className="row">
-          <label>
+          <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
             Documento
             <input value={createDocumento} onChange={(e) => setCreateDocumento(e.target.value)} required />
           </label>
-          <label>
+          <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
             Clave
             <input value={createClave} onChange={(e) => setCreateClave(e.target.value)} type="password" required />
           </label>
@@ -469,7 +469,7 @@ export default function UsersView() {
           </label>
         </div>
         <div className="row">
-          <label>
+          <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
             Docente ID
             <input
               value={createDocenteId}
@@ -489,7 +489,7 @@ export default function UsersView() {
           />
           <div />
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
-            <button type="submit" disabled={loading}>
+            <button type="submit" className="btnCompact" disabled={loading}>
               Crear
             </button>
           </div>
@@ -531,7 +531,7 @@ export default function UsersView() {
                   ? `${filteredUsers.length}/${users.length} usuario(s)`
                   : `${users.length} usuario(s)`}
             </div>
-            <button type="button" onClick={refresh} disabled={loading}>
+            <button type="button" className="btnCompact" onClick={refresh} disabled={loading}>
               Recargar
             </button>
           </div>
@@ -547,7 +547,7 @@ export default function UsersView() {
                 <th style={{ textAlign: 'left' }}>Activo</th>
                 <th style={{ textAlign: 'left' }}>Docente</th>
                 <th style={{ textAlign: 'left' }}>Estudiante</th>
-                <th style={{ textAlign: 'left' }}>Acciones</th>
+                <th style={{ textAlign: 'right' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -568,13 +568,15 @@ export default function UsersView() {
                   <td>{u.activo ? 'Sí' : 'No'}</td>
                   <td>{u.docenteId ?? '—'}</td>
                   <td>{u.estudianteId ?? '—'}</td>
-                  <td>
-                    <button type="button" onClick={() => setSelectedId(u.id)} disabled={loading}>
-                      Editar
-                    </button>{' '}
-                    <button type="button" onClick={() => onDelete(u)} disabled={loading}>
-                      Eliminar
-                    </button>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      <button type="button" className="btnCompact" onClick={() => setSelectedId(u.id)} disabled={loading}>
+                        Editar
+                      </button>
+                      <button type="button" className="btnCompact" onClick={() => onDelete(u)} disabled={loading}>
+                        Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -593,11 +595,11 @@ export default function UsersView() {
         <form onSubmit={onUpdate} className="card" style={{ gridColumn: 2 }}>
           <h3 style={{ margin: 0 }}>Editar #{selected.id}</h3>
           <div className="row">
-            <label>
+            <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
               Documento
               <input value={editDocumento} onChange={(e) => setEditDocumento(e.target.value)} required />
             </label>
-            <label>
+            <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
               Clave (opcional)
               <input
                 value={editClave}
@@ -620,7 +622,7 @@ export default function UsersView() {
             </label>
           </div>
           <div className="row">
-            <label>
+            <label style={{ flex: '1 1 260px', maxWidth: 380 }}>
               Docente ID
               <input
                 value={editDocenteId}
@@ -639,10 +641,10 @@ export default function UsersView() {
             />
             <div />
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 8 }}>
-              <button type="button" onClick={() => setSelectedId(null)} disabled={loading}>
+              <button type="button" className="btnCompact" onClick={() => setSelectedId(null)} disabled={loading}>
                 Cerrar
               </button>
-              <button type="submit" disabled={loading}>
+              <button type="submit" className="btnCompact" disabled={loading}>
                 Guardar
               </button>
             </div>
