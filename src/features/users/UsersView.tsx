@@ -431,20 +431,20 @@ export default function UsersView() {
   }
 
   return (
-    <div className="stack">
-      <div
-        style={{
-          display: 'flex',
-          gap: 12,
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-        }}
-      >
-        <h2 style={{ margin: 0, textAlign: 'left', paddingTop: 6 }}>Usuarios</h2>
+    <div
+      className="stack"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr',
+        columnGap: 12,
+        rowGap: 8,
+        alignItems: 'start',
+      }}
+    >
+      <h2 style={{ margin: 0, textAlign: 'left', paddingTop: 6, gridColumn: 1 }}>Usuarios</h2>
 
-        <form onSubmit={onCreate} className="card" style={{ flex: 1, minWidth: 520 }}>
-          <h3 style={{ margin: 0 }}>Crear</h3>
+      <form onSubmit={onCreate} className="card" style={{ gridColumn: 2 }}>
+        <h3 style={{ margin: 0 }}>Crear</h3>
         <div className="row">
           <label>
             Documento
@@ -493,12 +493,17 @@ export default function UsersView() {
             </button>
           </div>
         </div>
-        </form>
-      </div>
+      </form>
 
-      {error ? <div className="error">{error}</div> : null}
+      {error ? (
+        <div className="error" style={{ gridColumn: 2 }}>
+          {error}
+        </div>
+      ) : (
+        <div style={{ gridColumn: 2 }} />
+      )}
 
-      <div className="card">
+      <div className="card" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Lista</h3>
         <div
           style={{
@@ -584,7 +589,7 @@ export default function UsersView() {
       ) : null}
 
       {selected ? (
-        <form onSubmit={onUpdate} className="card">
+        <form onSubmit={onUpdate} className="card" style={{ gridColumn: 2 }}>
           <h3 style={{ margin: 0 }}>Editar #{selected.id}</h3>
           <div className="row">
             <label>
