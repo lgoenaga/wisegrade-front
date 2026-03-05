@@ -180,6 +180,13 @@
 /* Keep specific form rows on a single line on wide screens */
 .rowNoWrapWide {
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 @media (min-width: 1100px) {

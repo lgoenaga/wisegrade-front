@@ -130,7 +130,7 @@ function EstudianteCombobox({
   }, [disabled])
 
   return (
-    <label style={{ position: 'relative', minWidth: 320 }}>
+    <label className="formField" style={{ position: 'relative', minWidth: 320 }}>
       Estudiante
       <input
         value={query}
@@ -447,11 +447,11 @@ export default function UsersView() {
       <form onSubmit={onCreate} className="card" style={{ gridColumn: 2 }}>
         <h3 style={{ margin: 0 }}>Crear</h3>
         <div className="row rowNoWrapWide">
-          <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
+          <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
             Documento
             <input value={createDocumento} onChange={(e) => setCreateDocumento(e.target.value)} required />
           </label>
-          <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
+          <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
             Clave
             <input value={createClave} onChange={(e) => setCreateClave(e.target.value)} type="password" required />
           </label>
@@ -463,7 +463,7 @@ export default function UsersView() {
             onSelectedId={setCreateEstudianteId}
             resetKey={createEstudianteResetKey}
           />
-          <label style={{ flex: '0 1 160px', maxWidth: 220 }}>
+          <label className="formField" style={{ flex: '0 1 160px', maxWidth: 220 }}>
             Rol
             <select value={createRol} onChange={(e) => setCreateRol(e.target.value as UserRole)}>
               <option value="ADMIN">ADMIN</option>
@@ -477,7 +477,7 @@ export default function UsersView() {
           </label>
         </div>
         <div className="row">
-          <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
+          <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
             Docente ID
             <input
               value={createDocenteId}
@@ -595,11 +595,11 @@ export default function UsersView() {
         <form onSubmit={onUpdate} className="card" style={{ gridColumn: 2 }}>
           <h3 style={{ margin: 0 }}>Editar #{selected.id}</h3>
           <div className="row rowNoWrapWide">
-            <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
+            <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
               Documento
               <input value={editDocumento} onChange={(e) => setEditDocumento(e.target.value)} required />
             </label>
-            <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
+            <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
               Clave (opcional)
               <input
                 value={editClave}
@@ -615,7 +615,7 @@ export default function UsersView() {
               selectedId={editEstudianteId}
               onSelectedId={setEditEstudianteId}
             />
-            <label style={{ flex: '0 1 160px', maxWidth: 220 }}>
+            <label className="formField" style={{ flex: '0 1 160px', maxWidth: 220 }}>
               Rol
               <select value={editRol} onChange={(e) => setEditRol(e.target.value as UserRole)}>
                 <option value="ADMIN">ADMIN</option>
@@ -629,7 +629,7 @@ export default function UsersView() {
             </label>
           </div>
           <div className="row">
-            <label style={{ flex: '1 1 180px', maxWidth: 260 }}>
+            <label className="formField" style={{ flex: '1 1 180px', maxWidth: 260 }}>
               Docente ID
               <input
                 value={editDocenteId}
