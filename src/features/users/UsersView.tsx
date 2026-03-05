@@ -77,12 +77,14 @@ function EstudianteCombobox({
   estudiantes,
   selectedId,
   onSelectedId,
+  resetKey,
 }: {
   disabled: boolean
   required: boolean
   estudiantes: EstudianteResponse[]
   selectedId: number | null
   onSelectedId: (next: number | null) => void
+  resetKey?: number
 }) {
   const selected = useMemo(
     () => (selectedId == null ? null : estudiantes.find((e) => e.id === selectedId) ?? null),
@@ -100,7 +102,20 @@ function EstudianteCombobox({
     if (selected && query.trim() === '') {
       setQuery(formatEstudianteLabel(selected))
     }
-  }, [selected])
+
+    // Keep field text synced when a selection is set from outside.
+  }, [selected, query])
+
+  useEffect(() => {
+    if (resetKey == null) return
+    setQuery('')
+    setOpen(false)
+  }, [resetKey])
+
+  useEffect(() => {
+    if (!disabled) return
+    setOpen(false)
+  }, [disabled])
 
   return (
     <div className="field" style={{ position: 'relative', minWidth: 320 }}>
@@ -196,7 +211,7 @@ export default function UsersView() {
   const [createActivo, setCreateActivo] = useState(true)
   const [createDocenteId, setCreateDocenteId] = useState<string>('')
   const [createEstudianteId, setCreateEstudianteId] = useState<number | null>(null)
-
+  const [createEstudianteResetKey, setCreateEstudianteResetKey] = useState(0)
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const selected = useMemo(() => users.find((u) => u.id === selectedId) ?? null, [users, selectedId])
@@ -322,6 +337,7 @@ export default function UsersView() {
       setCreateActivo(true)
       setCreateDocenteId('')
       setCreateEstudianteId(null)
+      setCreateEstudianteResetKey((v) => v + 1)
       await refresh()
     } catch (e) {
       const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
@@ -435,6 +451,7 @@ export default function UsersView() {
             estudiantes={estudiantes}
             selectedId={createEstudianteId}
             onSelectedId={setCreateEstudianteId}
+            resetKey={createEstudianteResetKey}
           />
           <div />
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
