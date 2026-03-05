@@ -471,7 +471,7 @@ export default function UsersView() {
               <option value="ESTUDIANTE">ESTUDIANTE</option>
             </select>
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22, alignSelf: 'flex-end' }}>
             <input type="checkbox" checked={createActivo} onChange={(e) => setCreateActivo(e.target.checked)} />
             Activo
           </label>
@@ -623,7 +623,7 @@ export default function UsersView() {
                 <option value="ESTUDIANTE">ESTUDIANTE</option>
               </select>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22, alignSelf: 'flex-end' }}>
               <input type="checkbox" checked={editActivo} onChange={(e) => setEditActivo(e.target.checked)} />
               Activo
             </label>
