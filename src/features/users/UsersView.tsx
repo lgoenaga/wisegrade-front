@@ -432,12 +432,12 @@ export default function UsersView() {
 
   return (
     <div className="stack">
-      <h2>Usuarios</h2>
+      <h2 style={{ margin: 0, textAlign: 'left' }}>Usuarios</h2>
 
       {error ? <div className="error">{error}</div> : null}
 
       <form onSubmit={onCreate} className="card">
-        <h3>Crear</h3>
+        <h3 style={{ margin: 0 }}>Crear</h3>
         <div className="row">
           <label>
             Documento
@@ -489,7 +489,7 @@ export default function UsersView() {
       </form>
 
       <div className="card">
-        <h3>Lista</h3>
+        <h3 style={{ margin: 0 }}>Lista</h3>
         <div
           style={{
             display: 'flex',
@@ -575,7 +575,7 @@ export default function UsersView() {
 
       {selected ? (
         <form onSubmit={onUpdate} className="card">
-          <h3>Editar #{selected.id}</h3>
+          <h3 style={{ margin: 0 }}>Editar #{selected.id}</h3>
           <div className="row">
             <label>
               Documento
