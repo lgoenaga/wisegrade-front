@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 import { apiDelete, apiGetJson, apiPostJson, apiPutJson } from '../../lib/api'
 import type { UserRole } from '../auth/types'
@@ -90,6 +90,7 @@ function EstudianteCombobox({
     () => (selectedId == null ? null : estudiantes.find((e) => e.id === selectedId) ?? null),
     [estudiantes, selectedId],
   )
+  const dropdownRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
@@ -130,8 +131,10 @@ function EstudianteCombobox({
         onFocus={() => {
           if (!disabled) setOpen(true)
         }}
-        onBlur={() => {
-          window.setTimeout(() => setOpen(false), 120)
+        onBlur={(e) => {
+          const next = e.relatedTarget
+          if (next && dropdownRef.current?.contains(next)) return
+          setOpen(false)
         }}
         placeholder={disabled ? '—' : 'Digita para buscar…'}
         disabled={disabled}
@@ -140,6 +143,7 @@ function EstudianteCombobox({
 
       {!disabled && open ? (
         <div
+          ref={dropdownRef}
           style={{
             position: 'absolute',
             left: 0,
