@@ -202,6 +202,7 @@ function EstudianteCombobox({
 export default function UsersView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
   const [users, setUsers] = useState<AuthUserResponse[]>([])
 
   const [documentFilter, setDocumentFilter] = useState('')
@@ -250,6 +251,12 @@ export default function UsersView() {
   useEffect(() => {
     refresh()
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = window.setTimeout(() => setToast(null), 5000)
+    return () => window.clearTimeout(t)
+  }, [toast])
 
   useEffect(() => {
     let cancelled = false
@@ -384,9 +391,11 @@ export default function UsersView() {
       await apiPutJson<AuthUserResponse>(`/auth/users/${selected.id}`, payload)
       await refresh()
       setSelectedId(selected.id)
+      setToast({ kind: 'success', message: 'Usuario actualizado' })
     } catch (e) {
       const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
       setError(message)
+      setToast({ kind: 'error', message })
       setLoading(false)
     }
   }
@@ -610,6 +619,37 @@ export default function UsersView() {
             </div>
           </div>
         </form>
+      ) : null}
+
+      {toast ? (
+        <div
+          style={{
+            position: 'fixed',
+            right: 16,
+            bottom: 16,
+            zIndex: 1000,
+            width: 'min(520px, calc(100vw - 32px))',
+          }}
+          aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
+        >
+          <div className="card" style={{ padding: 10 }}>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 2 }}>{toast.kind === 'success' ? 'Éxito' : 'Error'}</div>
+                <div style={{ fontSize: 13, color: 'var(--wg-text)' }}>{toast.message}</div>
+              </div>
+              <button
+                type="button"
+                className="btnSecondary headerBtn"
+                onClick={() => setToast(null)}
+                disabled={loading}
+                title="Cerrar"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   )
