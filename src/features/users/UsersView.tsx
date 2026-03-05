@@ -349,10 +349,12 @@ export default function UsersView() {
       setCreateDocenteId('')
       setCreateEstudianteId(null)
       setCreateEstudianteResetKey((v) => v + 1)
+      setToast({ kind: 'success', message: 'Usuario creado' })
       await refresh()
     } catch (e) {
       const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
       setError(message)
+      setToast({ kind: 'error', message })
       setLoading(false)
     }
   }
