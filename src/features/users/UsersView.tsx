@@ -432,12 +432,19 @@ export default function UsersView() {
 
   return (
     <div className="stack">
-      <h2 style={{ margin: 0, textAlign: 'left' }}>Usuarios</h2>
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+        }}
+      >
+        <h2 style={{ margin: 0, textAlign: 'left', paddingTop: 6 }}>Usuarios</h2>
 
-      {error ? <div className="error">{error}</div> : null}
-
-      <form onSubmit={onCreate} className="card">
-        <h3 style={{ margin: 0 }}>Crear</h3>
+        <form onSubmit={onCreate} className="card" style={{ flex: 1, minWidth: 520 }}>
+          <h3 style={{ margin: 0 }}>Crear</h3>
         <div className="row">
           <label>
             Documento
@@ -486,7 +493,10 @@ export default function UsersView() {
             </button>
           </div>
         </div>
-      </form>
+        </form>
+      </div>
+
+      {error ? <div className="error">{error}</div> : null}
 
       <div className="card">
         <h3 style={{ margin: 0 }}>Lista</h3>
