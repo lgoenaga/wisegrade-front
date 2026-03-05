@@ -38,12 +38,13 @@ function extractErrorStatus(err: unknown): number | null {
 
 function App() {
   const [attempt, setAttempt] = useState<IntentoSnapshot | null>(null)
-  const [screen, setScreen] = useState<'start' | 'results'>('start')
+  const [screen, setScreen] = useState<'start' | 'results' | 'users'>('start')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
   const [me, setMe] = useState<AuthMeResponse | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     const ac = new AbortController()
@@ -231,11 +232,16 @@ function App() {
     } catch {
       // Ignore logout failures; clearing client state is still useful.
     } finally {
+      setMenuOpen(false)
       setMe(null)
       setAttempt(null)
       clearLastAttemptId()
       setScreen('start')
     }
+  }
+
+  function closeMenu() {
+    setMenuOpen(false)
   }
 
   if (!authChecked) {
@@ -260,7 +266,7 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" onClick={() => closeMenu()}>
       <header className="appHeader">
         <div className="appHeaderInner">
           <img className="appLogo" src={cesdeLogo} alt="CESDE" />
@@ -269,6 +275,37 @@ function App() {
             <div className="appSubtitle">Examen en línea</div>
           </div>
           <div className="appHeaderActions">
+            {me && me.rol === 'ADMIN' ? (
+              <div className="headerMenu" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="btnSecondary headerBtn"
+                  aria-label="Menú"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((v) => !v)}
+                >
+                  ☰
+                </button>
+
+                {menuOpen ? (
+                  <div className="headerMenuDropdown" role="menu">
+                    <button
+                      type="button"
+                      className="headerMenuItem"
+                      role="menuitem"
+                      onClick={() => {
+                        setScreen('users')
+                        setMenuOpen(false)
+                      }}
+                    >
+                      Usuarios
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {me ? (
               <button className="btnSecondary headerBtn" onClick={handleLogout}>
                 Salir
@@ -276,7 +313,7 @@ function App() {
             ) : null}
 
             {me && !attempt && me.rol === 'ADMIN' ? (
-              screen === 'start' ? (
+              screen !== 'results' ? (
                 <button className="btnSecondary headerBtn" onClick={() => setScreen('results')}>
                   Ver resultados
                 </button>
@@ -310,12 +347,10 @@ function App() {
             error={error}
             lockedEstudiante={me.estudiante}
           />
+        ) : screen === 'results' ? (
+          <ResultsView rol="ADMIN" />
         ) : (
-          screen === 'results' ? (
-            <ResultsView rol="ADMIN" />
-          ) : (
-            <StartAttemptForm onStart={handleStart} busy={busy} error={error} />
-          )
+          <StartAttemptForm onStart={handleStart} busy={busy} error={error} />
         )}
       </main>
     </div>

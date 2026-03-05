@@ -46,6 +46,39 @@
   gap: 8px;
 }
 
+.headerMenu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.headerMenuDropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 180px;
+  background: var(--wg-surface);
+  border: 1px solid var(--wg-border);
+  border-radius: 12px;
+  padding: 6px;
+  z-index: 20;
+}
+
+.headerMenuItem {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--wg-text);
+}
+
+.headerMenuItem:hover {
+  border-color: var(--wg-border);
+  filter: brightness(0.99);
+}
+
 .headerBtn {
   padding: 6px 10px;
   font-size: 0.92rem;
