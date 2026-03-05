@@ -30,6 +30,14 @@ type AuthUserUpdateRequest = {
   estudianteId?: number | null
 }
 
+type EstudianteResponse = {
+  id: number
+  nombres: string
+  apellidos: string
+  documento: string
+  activo: boolean
+}
+
 function normalizeLinksForRole(rol: UserRole, docenteId: number | null, estudianteId: number | null) {
   if (rol === 'ADMIN') return { docenteId: null, estudianteId: null }
   if (rol === 'DOCENTE') return { docenteId, estudianteId: null }
@@ -47,6 +55,131 @@ function normalizeText(value: string): string {
   return value.trim().toLowerCase()
 }
 
+function formatEstudianteLabel(e: EstudianteResponse): string {
+  const fullName = `${e.nombres ?? ''} ${e.apellidos ?? ''}`.trim()
+  return fullName ? `${e.documento} — ${fullName}` : e.documento
+}
+
+function matchesEstudiante(e: EstudianteResponse, query: string): boolean {
+  const q = normalizeText(query)
+  if (!q) return true
+  return (
+    normalizeText(e.documento).includes(q) ||
+    normalizeText(e.nombres).includes(q) ||
+    normalizeText(e.apellidos).includes(q) ||
+    normalizeText(`${e.nombres} ${e.apellidos}`).includes(q)
+  )
+}
+
+function EstudianteCombobox({
+  disabled,
+  required,
+  estudiantes,
+  selectedId,
+  onSelectedId,
+}: {
+  disabled: boolean
+  required: boolean
+  estudiantes: EstudianteResponse[]
+  selectedId: number | null
+  onSelectedId: (next: number | null) => void
+}) {
+  const selected = useMemo(
+    () => (selectedId == null ? null : estudiantes.find((e) => e.id === selectedId) ?? null),
+    [estudiantes, selectedId],
+  )
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const filtered = useMemo(() => {
+    const base = (Array.isArray(estudiantes) ? estudiantes : []).filter((e) => matchesEstudiante(e, query))
+    return base.slice(0, 25)
+  }, [estudiantes, query])
+
+  useEffect(() => {
+    if (selected && query.trim() === '') {
+      setQuery(formatEstudianteLabel(selected))
+    }
+  }, [selected])
+
+  return (
+    <div className="field" style={{ position: 'relative', minWidth: 320 }}>
+      <label>Estudiante</label>
+      <input
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setOpen(true)
+          onSelectedId(null)
+        }}
+        onFocus={() => {
+          if (!disabled) setOpen(true)
+        }}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 120)
+        }}
+        placeholder={disabled ? '—' : 'Digita para buscar…'}
+        disabled={disabled}
+        aria-required={required}
+      />
+
+      {!disabled && open ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 'calc(100% + 6px)',
+            background: 'var(--wg-surface)',
+            border: '1px solid var(--wg-border)',
+            borderRadius: 12,
+            padding: 6,
+            zIndex: 30,
+            maxHeight: 260,
+            overflowY: 'auto',
+          }}
+          role="listbox"
+        >
+          {filtered.length ? (
+            filtered.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => {
+                  onSelectedId(e.id)
+                  setQuery(formatEstudianteLabel(e))
+                  setOpen(false)
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: '1px solid transparent',
+                  background: 'transparent',
+                  color: 'var(--wg-text)',
+                  cursor: 'pointer',
+                }}
+                role="option"
+              >
+                {formatEstudianteLabel(e)}
+              </button>
+            ))
+          ) : (
+            <div style={{ padding: '8px 10px', color: 'var(--wg-muted)' }}>Sin resultados</div>
+          )}
+        </div>
+      ) : null}
+
+      {!disabled && required && selectedId == null ? (
+        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+          Requerido
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function UsersView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -54,12 +187,15 @@ export default function UsersView() {
 
   const [documentFilter, setDocumentFilter] = useState('')
 
+  const [estudiantes, setEstudiantes] = useState<EstudianteResponse[]>([])
+  const [estudiantesError, setEstudiantesError] = useState<string | null>(null)
+
   const [createDocumento, setCreateDocumento] = useState('')
   const [createClave, setCreateClave] = useState('')
   const [createRol, setCreateRol] = useState<UserRole>('ESTUDIANTE')
   const [createActivo, setCreateActivo] = useState(true)
   const [createDocenteId, setCreateDocenteId] = useState<string>('')
-  const [createEstudianteId, setCreateEstudianteId] = useState<string>('')
+  const [createEstudianteId, setCreateEstudianteId] = useState<number | null>(null)
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
@@ -70,7 +206,7 @@ export default function UsersView() {
   const [editRol, setEditRol] = useState<UserRole>('ESTUDIANTE')
   const [editActivo, setEditActivo] = useState(true)
   const [editDocenteId, setEditDocenteId] = useState<string>('')
-  const [editEstudianteId, setEditEstudianteId] = useState<string>('')
+  const [editEstudianteId, setEditEstudianteId] = useState<number | null>(null)
 
   const filteredUsers = useMemo(() => {
     const q = normalizeText(documentFilter)
@@ -97,24 +233,75 @@ export default function UsersView() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    const ac = new AbortController()
+    setEstudiantesError(null)
+
+    ;(async () => {
+      try {
+        const data = await apiGetJson<EstudianteResponse[]>('/estudiantes', ac.signal)
+        if (cancelled) return
+        setEstudiantes(Array.isArray(data) ? data : [])
+      } catch (e) {
+        const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
+        if (cancelled) return
+        setEstudiantes([])
+        setEstudiantesError(message)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      ac.abort()
+    }
+  }, [])
+
+  useEffect(() => {
     if (!selected) return
     setEditDocumento(selected.documento)
     setEditRol(selected.rol)
     setEditActivo(selected.activo)
     setEditClave('')
     setEditDocenteId(selected.docenteId == null ? '' : String(selected.docenteId))
-    setEditEstudianteId(selected.estudianteId == null ? '' : String(selected.estudianteId))
+    setEditEstudianteId(selected.estudianteId == null ? null : selected.estudianteId)
   }, [selected])
+
+  useEffect(() => {
+    if (createRol !== 'ESTUDIANTE') {
+      setCreateEstudianteId(null)
+    }
+    if (createRol !== 'DOCENTE') {
+      setCreateDocenteId('')
+    }
+  }, [createRol])
+
+  useEffect(() => {
+    if (editRol !== 'ESTUDIANTE') {
+      setEditEstudianteId(null)
+    }
+    if (editRol !== 'DOCENTE') {
+      setEditDocenteId('')
+    }
+  }, [editRol])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
     setError(null)
 
+    if (createRol === 'DOCENTE' && parseNullableInt(createDocenteId) == null) {
+      setError('DOCENTE requiere Docente ID')
+      return
+    }
+    if (createRol === 'ESTUDIANTE' && createEstudianteId == null) {
+      setError('ESTUDIANTE requiere seleccionar un estudiante')
+      return
+    }
+
     const documento = createDocumento.trim()
     const clave = createClave
 
     const docenteId = parseNullableInt(createDocenteId)
-    const estudianteId = parseNullableInt(createEstudianteId)
+    const estudianteId = createEstudianteId
     const links = normalizeLinksForRole(createRol, docenteId, estudianteId)
 
     const payload: AuthUserCreateRequest = {
@@ -134,7 +321,7 @@ export default function UsersView() {
       setCreateRol('ESTUDIANTE')
       setCreateActivo(true)
       setCreateDocenteId('')
-      setCreateEstudianteId('')
+      setCreateEstudianteId(null)
       await refresh()
     } catch (e) {
       const message = e && typeof e === 'object' && 'message' in e ? String((e as any).message) : 'Error'
@@ -148,10 +335,19 @@ export default function UsersView() {
     if (!selected) return
     setError(null)
 
+    if (editRol === 'DOCENTE' && parseNullableInt(editDocenteId) == null) {
+      setError('DOCENTE requiere Docente ID')
+      return
+    }
+    if (editRol === 'ESTUDIANTE' && editEstudianteId == null) {
+      setError('ESTUDIANTE requiere seleccionar un estudiante')
+      return
+    }
+
     const documento = editDocumento.trim()
     const clave = editClave.trim() === '' ? undefined : editClave
     const docenteId = parseNullableInt(editDocenteId)
-    const estudianteId = parseNullableInt(editEstudianteId)
+    const estudianteId = editEstudianteId
     const links = normalizeLinksForRole(editRol, docenteId, estudianteId)
 
     const payload: AuthUserUpdateRequest = {
@@ -233,16 +429,13 @@ export default function UsersView() {
               disabled={createRol !== 'DOCENTE'}
             />
           </label>
-          <label>
-            Estudiante ID
-            <input
-              value={createEstudianteId}
-              onChange={(e) => setCreateEstudianteId(e.target.value)}
-              inputMode="numeric"
-              placeholder={createRol === 'ESTUDIANTE' ? 'Requerido' : '—'}
-              disabled={createRol !== 'ESTUDIANTE'}
-            />
-          </label>
+          <EstudianteCombobox
+            disabled={createRol !== 'ESTUDIANTE'}
+            required={createRol === 'ESTUDIANTE'}
+            estudiantes={estudiantes}
+            selectedId={createEstudianteId}
+            onSelectedId={setCreateEstudianteId}
+          />
           <div />
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end' }}>
             <button type="submit" disabled={loading}>
@@ -331,6 +524,12 @@ export default function UsersView() {
         </div>
       </div>
 
+      {estudiantesError ? (
+        <div className="muted" style={{ fontSize: 12 }}>
+          No se pudo cargar estudiantes: {estudiantesError}
+        </div>
+      ) : null}
+
       {selected ? (
         <form onSubmit={onUpdate} className="card">
           <h3>Editar #{selected.id}</h3>
@@ -372,16 +571,13 @@ export default function UsersView() {
                 disabled={editRol !== 'DOCENTE'}
               />
             </label>
-            <label>
-              Estudiante ID
-              <input
-                value={editEstudianteId}
-                onChange={(e) => setEditEstudianteId(e.target.value)}
-                inputMode="numeric"
-                placeholder={editRol === 'ESTUDIANTE' ? 'Requerido' : '—'}
-                disabled={editRol !== 'ESTUDIANTE'}
-              />
-            </label>
+            <EstudianteCombobox
+              disabled={editRol !== 'ESTUDIANTE'}
+              required={editRol === 'ESTUDIANTE'}
+              estudiantes={estudiantes}
+              selectedId={editEstudianteId}
+              onSelectedId={setEditEstudianteId}
+            />
             <div />
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 8 }}>
               <button type="button" onClick={() => setSelectedId(null)} disabled={loading}>
