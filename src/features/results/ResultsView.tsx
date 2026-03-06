@@ -250,6 +250,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [ensuring, setEnsuring] = useState(false)
   const [ensureError, setEnsureError] = useState<string | null>(null)
   const [ensuredExamenId, setEnsuredExamenId] = useState<number | null>(null)
+  const [beneficioEnsure, setBeneficioEnsure] = useState(false)
 
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [periodos, setPeriodos] = useState<Periodo[]>([])
@@ -447,6 +448,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
         materiaId: parsed.materiaId as number,
         momentoId: parsed.momentoId as number,
         docenteResponsableId: parsed.docenteResponsableId as number,
+        beneficio: beneficioEnsure,
       }
 
       const res = await apiPostJson<ExamenEnsureResponse>('/examenes/asegurar', payload)
@@ -1253,6 +1255,19 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     >
                       {ensuring ? 'Creando…' : 'Crear examen'}
                     </button>
+
+                    <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={beneficioEnsure}
+                        disabled={ensuring || busy || uploadBusy || associating}
+                        onChange={(e) => setBeneficioEnsure(e.target.checked)}
+                      />
+                      <span style={{ fontSize: 13 }}>
+                        Beneficio (excluir hasta 5 incorrectas)
+                      </span>
+                    </label>
+
                     <div className="muted" style={{ fontSize: 12 }}>
                       {ensuredExamenId || data?.examenId
                         ? `Examen ID: ${ensuredExamenId ?? data?.examenId}`
