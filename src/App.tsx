@@ -16,7 +16,6 @@ import type {
   RespuestaCorrecta,
 } from './features/exam/types'
 import {
-  clearAttemptDraft,
   clearLastAttemptId,
   loadAttemptDraft,
   loadLastAttemptId,
@@ -228,25 +227,6 @@ function App() {
     saveLastAttemptId(attemptId)
   }
 
-  async function handleRepeat(attemptId: number) {
-    const prevDraft = loadAttemptDraft(attemptId)
-
-    const res = await apiPostJson<IntentoIniciarResponse>(`/intentos/${attemptId}/repetir`, {})
-
-    clearAttemptDraft(attemptId)
-
-    saveAttemptDraft({
-      intentoSnapshot: res,
-      meta: prevDraft?.meta,
-      answersByPreguntaId: {},
-      pendingSubmit: false,
-      antiCheatWarnings: 0,
-      blocked: false,
-    })
-    saveLastAttemptId(res.intentoId)
-    setAttempt(res)
-  }
-
   async function handleLogout() {
     try {
       await apiPostJson<void>('/auth/logout', {})
@@ -358,7 +338,7 @@ function App() {
             }}
           />
         ) : attempt ? (
-          <ExamAttemptView intento={attempt} onSubmitted={handleSubmitted} onRepeat={handleRepeat} />
+          <ExamAttemptView intento={attempt} onSubmitted={handleSubmitted} />
         ) : me.rol === 'DOCENTE' ? (
           <ResultsView lockedDocenteId={me.docente?.id ?? null} rol="DOCENTE" />
         ) : me.rol === 'ESTUDIANTE' ? (

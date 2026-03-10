@@ -20,7 +20,6 @@ import type {
 type Props = {
   intento: IntentoSnapshot
   onSubmitted: (attemptId: number) => void
-  onRepeat: (attemptId: number) => Promise<void>
 }
 
 function answersFromServer(respuestas: RespuestaGuardadaResponse[] | undefined): Record<string, RespuestaCorrecta> {
@@ -51,7 +50,7 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return String(msg)
 }
 
-export function ExamAttemptView({ intento, onSubmitted, onRepeat }: Props) {
+export function ExamAttemptView({ intento, onSubmitted }: Props) {
   const startedAt = intento.startedAt
   const deadlineAt = (intento as { deadlineAt?: string | null }).deadlineAt ?? null
 
@@ -75,7 +74,6 @@ export function ExamAttemptView({ intento, onSubmitted, onRepeat }: Props) {
   const [blocked, setBlocked] = useState(false)
   const [submitOk, setSubmitOk] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [repeating, setRepeating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [antiCheatNote, setAntiCheatNote] = useState<string | null>(null)
   const [attemptMeta, setAttemptMeta] = useState<{ materiaNombre?: string } | null>(null)
@@ -106,7 +104,6 @@ export function ExamAttemptView({ intento, onSubmitted, onRepeat }: Props) {
     navInitializedRef.current = false
     setError(null)
     setSubmitting(false)
-    setRepeating(false)
     setSubmitOk(false)
     setSubmittedDetail(null)
     timeAutoSubmitTriggeredRef.current = false
@@ -597,12 +594,6 @@ export function ExamAttemptView({ intento, onSubmitted, onRepeat }: Props) {
         Estado: <strong>{submitOk ? 'ENVIADO' : pendingSubmit ? 'PENDIENTE DE ENVÍO' : 'EN PROGRESO'}</strong>
       </div>
 
-          {isSubmitted ? (
-            <p style={{ marginTop: 6, fontSize: 13 }}>
-              <strong>Aviso:</strong> Este intento ya fue enviado. Puedes repetir el examen 1 vez usando el botón “Repetir”.
-            </p>
-          ) : null}
-
       {isSubmitted ? (
         <div style={{ marginTop: 6, fontSize: 13 }}>
           <strong>Resultado:</strong>{' '}
@@ -621,28 +612,6 @@ export function ExamAttemptView({ intento, onSubmitted, onRepeat }: Props) {
         <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="button" className="btnSecondary examBtn" onClick={() => void handleExportPdf()} disabled={exportingPdf}>
             {exportingPdf ? 'Exportando PDF…' : 'Exportar PDF'}
-          </button>
-
-          <button
-            type="button"
-            className="btnSecondary examBtn"
-            onClick={() => {
-              if (repeating) return
-              setError(null)
-              setRepeating(true)
-              ;(async () => {
-                try {
-                  await onRepeat(intento.intentoId)
-                } catch (e: unknown) {
-                  setError(extractErrorMessage(e, 'No se pudo repetir el examen'))
-                } finally {
-                  setRepeating(false)
-                }
-              })()
-            }}
-            disabled={repeating}
-          >
-            {repeating ? 'Repitiendo…' : 'Repetir'}
           </button>
         </div>
       ) : null}

@@ -270,6 +270,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   const [deletingIntentoId, setDeletingIntentoId] = useState<number | null>(null)
   const [reopeningIntentoId, setReopeningIntentoId] = useState<number | null>(null)
   const [forceSubmittingIntentoId, setForceSubmittingIntentoId] = useState<number | null>(null)
+  const [repeatingIntentoId, setRepeatingIntentoId] = useState<number | null>(null)
 
   const [confirmDelete, setConfirmDelete] = useState<{
     intentoId: number
@@ -737,6 +738,35 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
     })
   }
 
+  async function handleRepeatIntento(params: {
+    intentoId: number
+    estudianteNombre: string
+    documento: string
+  }) {
+    const { intentoId, estudianteNombre, documento } = params
+    if (!intentoId || busy) return
+    if (rol !== 'ADMIN' && rol !== 'DOCENTE') return
+    if (repeatingIntentoId != null || deletingIntentoId != null || reopeningIntentoId != null || forceSubmittingIntentoId != null) return
+
+    setRepeatingIntentoId(intentoId)
+    setError(null)
+    setToast(null)
+
+    try {
+      const res = await apiPostJson<{ intentoId: number }>(`/intentos/${intentoId}/repetir`, {})
+      await handleQuery()
+      setToast({
+        kind: 'success',
+        message: `Intento ${intentoId} repetido (${documento} — ${estudianteNombre}). Nuevo intento: ${res.intentoId}.`,
+      })
+    } catch (e: unknown) {
+      const msg = extractErrorMessage(e, 'No se pudo repetir el intento')
+      setToast({ kind: 'error', message: `Repetir falló: ${msg}` })
+    } finally {
+      setRepeatingIntentoId(null)
+    }
+  }
+
   const filas = useMemo(() => {
     const all = data?.filas ?? []
     if (estadoFiltro === 'TODOS') return all
@@ -1044,12 +1074,14 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     const canDelete =
                       (rol === 'ADMIN') ||
                       (rol === 'DOCENTE' && f.estado !== 'SUBMITTED')
+                    const canRepeat = (rol === 'ADMIN' || rol === 'DOCENTE') && f.estado === 'SUBMITTED'
                     const canReopen = (rol === 'ADMIN' || rol === 'DOCENTE') && f.estado === 'BLOCKED' && (f.reopenCount ?? 0) < 1
                     const canForceSubmit = (rol === 'ADMIN' || rol === 'DOCENTE') && f.estado === 'BLOCKED'
                     const isDeleting = deletingIntentoId === f.intentoId
                     const isReopening = reopeningIntentoId === f.intentoId
                     const isForceSubmitting = forceSubmittingIntentoId === f.intentoId
-                    const anyRowBusy = busy || deletingIntentoId != null || reopeningIntentoId != null || forceSubmittingIntentoId != null
+                    const isRepeating = repeatingIntentoId === f.intentoId
+                    const anyRowBusy = busy || deletingIntentoId != null || reopeningIntentoId != null || forceSubmittingIntentoId != null || repeatingIntentoId != null
                     return (
                       <tr key={f.intentoId}>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
@@ -1118,6 +1150,24 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                                 title="Forzar envío definitivo (solo BLOQUEADO)"
                               >
                                 {isForceSubmitting ? 'Enviando…' : 'Forzar envío'}
+                              </button>
+                            ) : null}
+
+                            {canRepeat ? (
+                              <button
+                                type="button"
+                                className="btnSecondary headerBtn"
+                                disabled={anyRowBusy}
+                                onClick={() =>
+                                  void handleRepeatIntento({
+                                    intentoId: f.intentoId,
+                                    estudianteNombre,
+                                    documento: est.documento,
+                                  })
+                                }
+                                title="Repetir (archiva el intento actual y crea uno nuevo)"
+                              >
+                                {isRepeating ? 'Repitiendo…' : 'Repetir'}
                               </button>
                             ) : null}
 
