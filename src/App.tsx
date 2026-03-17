@@ -37,6 +37,22 @@ function extractErrorStatus(err: unknown): number | null {
   return typeof status === 'number' ? status : null
 }
 
+function buildSubmittedDraft(serverAttempt: IntentoDetalleResponse, materiaNombre?: string | null) {
+  const answersByPreguntaId: Record<string, RespuestaCorrecta> = {}
+  for (const r of serverAttempt.respuestas ?? []) {
+    answersByPreguntaId[String(r.preguntaId)] = r.respuesta
+  }
+
+  saveAttemptDraft({
+    intentoSnapshot: serverAttempt,
+    meta: materiaNombre ? { materiaNombre } : undefined,
+    answersByPreguntaId,
+    pendingSubmit: false,
+    antiCheatWarnings: 0,
+    blocked: false,
+  })
+}
+
 function App() {
   const [attempt, setAttempt] = useState<IntentoSnapshot | null>(null)
   const [screen, setScreen] = useState<'start' | 'results' | 'users'>('start')
@@ -173,24 +189,23 @@ function App() {
     setBusy(true)
     setError(undefined)
     try {
+      try {
+        const reviewAttempt = await apiPostJson<IntentoDetalleResponse>('/intentos/revisar', req)
+        setAttempt(reviewAttempt)
+        buildSubmittedDraft(reviewAttempt, meta?.materiaNombre ?? null)
+        saveLastAttemptId(reviewAttempt.intentoId)
+        return
+      } catch (e: unknown) {
+        if (extractErrorStatus(e) !== 404) {
+          throw e
+        }
+      }
+
       const res = await apiPostJson<IntentoIniciarResponse>('/intentos/iniciar', req)
       if (res.estado === 'SUBMITTED') {
         const serverAttempt = await apiGetJson<IntentoDetalleResponse>(`/intentos/${res.intentoId}`)
         setAttempt(serverAttempt)
-
-        const answersByPreguntaId: Record<string, RespuestaCorrecta> = {}
-        for (const r of serverAttempt.respuestas ?? []) {
-          answersByPreguntaId[String(r.preguntaId)] = r.respuesta
-        }
-
-        saveAttemptDraft({
-          intentoSnapshot: serverAttempt,
-          meta: meta?.materiaNombre ? { materiaNombre: meta.materiaNombre } : undefined,
-          answersByPreguntaId,
-          pendingSubmit: false,
-          antiCheatWarnings: 0,
-          blocked: false,
-        })
+        buildSubmittedDraft(serverAttempt, meta?.materiaNombre ?? null)
         saveLastAttemptId(serverAttempt.intentoId)
         return
       }

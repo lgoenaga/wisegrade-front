@@ -223,6 +223,13 @@ function downloadCsv(filename: string, rows: Array<Array<unknown>>) {
   URL.revokeObjectURL(url)
 }
 
+function getResultadosResumen(fila: ExamenResultadosResponse['filas'][number]): string {
+  if (fila.estado === 'SUBMITTED' && fila.resultado) {
+    return `${fila.resultado.correctas}/${fila.resultado.total}`
+  }
+  return `${fila.preguntasRespondidas}/${fila.cantidadPreguntas}`
+}
+
 type Props = {
   lockedDocenteId?: number | null
   rol?: 'ADMIN' | 'DOCENTE'
@@ -1016,7 +1023,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     onClick={() => {
                       if (!data) return
                       const rows: Array<Array<unknown>> = [
-                        ['Documento', 'Estudiante', 'Estado', 'Respondidas/Asignadas', 'Nota', 'Inicio', 'Envío', 'No Examen'],
+                        ['Documento', 'Estudiante', 'Estado', 'Resultado/Avance', 'Nota', 'Inicio', 'Envío', 'No Examen'],
                         ...filas.map((f) => {
                           const est = f.estudiante
                           const estudianteNombre = `${est.nombres} ${est.apellidos}`
@@ -1025,7 +1032,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                             est.documento,
                             estudianteNombre,
                             f.estado,
-                            `${f.preguntasRespondidas}/${f.cantidadPreguntas}`,
+                            getResultadosResumen(f),
                             nota,
                             formatLocalDateTimeHM(f.startedAt),
                             formatLocalDateTimeHM(f.submittedAt),
@@ -1088,7 +1095,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Documento</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estudiante</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estado</th>
-                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Resp./Asig.</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Resultado/Avance</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Nota</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Inicio</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Envío</th>
@@ -1101,7 +1108,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     const est = f.estudiante
                     const estudianteNombre = `${est.nombres} ${est.apellidos}`
                     const nota = typeof f.resultado?.notaSobre5 === 'number' ? f.resultado.notaSobre5.toFixed(2) : ''
-                    const progresoPreguntas = `${f.preguntasRespondidas}/${f.cantidadPreguntas}`
+                    const progresoPreguntas = getResultadosResumen(f)
 
                     const canDelete =
                       (rol === 'ADMIN') ||
