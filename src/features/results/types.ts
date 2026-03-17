@@ -32,5 +32,6 @@ export type ExamenResultadosResponse = {
   materiaId: number
   momentoId: number
   docenteResponsableId: number
+  beneficio: boolean
   filas: ExamenResultadoFilaResponse[]
 }

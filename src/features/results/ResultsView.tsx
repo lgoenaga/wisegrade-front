@@ -40,6 +40,7 @@ type ExamenEnsureResponse = {
   examenId: number
   created: boolean
   totalBanco: number
+  beneficio: boolean
 }
 
 type EstudianteCreateRequest = {
@@ -393,6 +394,8 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
   }, [busy, docentesForMateria.length, ensuring, parsed.docenteResponsableId, parsed.materiaId, parsed.momentoId, parsed.periodoId, rol, uploadBusy])
 
   const canEnsure = ensureDisabledReason == null
+  const hasExam = Boolean(ensuredExamenId || data?.examenId)
+  const beneficioDirty = data != null ? data.beneficio !== beneficioEnsure : false
 
   const selectedMateriaNombre = useMemo(() => {
     if (!parsed.materiaId) return null
@@ -419,6 +422,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
       const res = await apiGetJson<ExamenResultadosResponse>(`/examenes/resultados?${qs.toString()}`)
       setData(res)
       setEnsuredExamenId(res?.examenId ?? null)
+      setBeneficioEnsure(Boolean(res?.beneficio))
       setPage(1)
     } catch (e: unknown) {
       setError(extractErrorMessage(e, 'No se pudieron cargar los resultados'))
@@ -426,6 +430,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
       // If the exam does not exist yet, keep ensuredExamenId null.
       if (extractErrorStatus(e) === 404) {
         setEnsuredExamenId(null)
+        setBeneficioEnsure(false)
       }
     } finally {
       setBusy(false)
@@ -454,12 +459,13 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
 
       const res = await apiPostJson<ExamenEnsureResponse>('/examenes/asegurar', payload)
       setEnsuredExamenId(res.examenId)
+      setBeneficioEnsure(res.beneficio)
 
       setToast({
         kind: 'success',
         message: res.created
-          ? `Examen creado con éxito (ID ${res.examenId}). Banco actual: ${res.totalBanco}.`
-          : `Examen ya existía (ID ${res.examenId}). Banco actual: ${res.totalBanco}.`,
+          ? `Examen creado con éxito (ID ${res.examenId}). Beneficio ${res.beneficio ? 'activado' : 'desactivado'}. Banco actual: ${res.totalBanco}.`
+          : `Examen ya existía (ID ${res.examenId}). Beneficio ${res.beneficio ? 'activado' : 'desactivado'}. Banco actual: ${res.totalBanco}.`,
       })
 
       // Best-effort refresh so the exam becomes visible in the view.
@@ -970,14 +976,36 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
         {data ? (
           <div className="stack" style={{ gap: 10 }}>
             <div className="card" style={{ padding: 10 }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
+              <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontWeight: 800 }}>{selectedMateriaNombre ? `Examen: ${selectedMateriaNombre}` : 'Examen'}</div>
                   <div className="muted" style={{ fontSize: 13 }}>
                     ID Examen: {data.examenId}
                   </div>
+                  <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                    Beneficio: {data.beneficio ? 'activado' : 'desactivado'}
+                  </div>
                 </div>
-                <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+                <div className="row" style={{ gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={beneficioEnsure}
+                      disabled={ensuring || busy || uploadBusy || associating}
+                      onChange={(e) => setBeneficioEnsure(e.target.checked)}
+                    />
+                    <span style={{ fontSize: 13 }}>
+                      Beneficio (excluir hasta 5 incorrectas)
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    disabled={ensuring || busy || uploadBusy || associating || !beneficioDirty}
+                    onClick={handleEnsureExam}
+                  >
+                    {ensuring ? 'Guardando…' : 'Guardar beneficio'}
+                  </button>
                   <div className="muted" style={{ fontSize: 13 }}>
                     Filas: {filas.length}
                   </div>
@@ -1303,25 +1331,28 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                       disabled={!canEnsure}
                       onClick={handleEnsureExam}
                     >
-                      {ensuring ? 'Creando…' : 'Crear examen'}
+                      {ensuring ? 'Guardando…' : hasExam ? 'Actualizar examen' : 'Crear examen'}
                     </button>
 
-                    <label className="row" style={{ gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={beneficioEnsure}
-                        disabled={ensuring || busy || uploadBusy || associating}
-                        onChange={(e) => setBeneficioEnsure(e.target.checked)}
-                      />
-                      <span style={{ fontSize: 13 }}>
-                        Beneficio (excluir hasta 5 incorrectas)
-                      </span>
-                    </label>
+                    {!hasExam ? (
+                      <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={beneficioEnsure}
+                          disabled={ensuring || busy || uploadBusy || associating}
+                          onChange={(e) => setBeneficioEnsure(e.target.checked)}
+                        />
+                        <span style={{ fontSize: 13 }}>
+                          Beneficio (excluir hasta 5 incorrectas)
+                        </span>
+                      </label>
+                    ) : null}
 
                     <div className="muted" style={{ fontSize: 12 }}>
                       {ensuredExamenId || data?.examenId
-                        ? `Examen ID: ${ensuredExamenId ?? data?.examenId}`
+                        ? `Examen ID: ${ensuredExamenId ?? data?.examenId}. Beneficio: ${(data?.beneficio ?? beneficioEnsure) ? 'activado' : 'desactivado'}.`
                         : 'Aún no existe un examen para esta configuración.'}
+                      {hasExam ? ' Puedes cambiar el beneficio directamente desde el encabezado de resultados.' : ''}
                       {ensureDisabledReason ? ` ${ensureDisabledReason}` : ' Créalo para habilitar la carga.'}
                     </div>
                   </div>
