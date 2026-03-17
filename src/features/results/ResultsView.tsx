@@ -1016,7 +1016,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     onClick={() => {
                       if (!data) return
                       const rows: Array<Array<unknown>> = [
-                        ['Documento', 'Estudiante', 'Estado', 'Nota', 'Inicio', 'Envío', 'No Examen'],
+                        ['Documento', 'Estudiante', 'Estado', 'Respondidas/Asignadas', 'Nota', 'Inicio', 'Envío', 'No Examen'],
                         ...filas.map((f) => {
                           const est = f.estudiante
                           const estudianteNombre = `${est.nombres} ${est.apellidos}`
@@ -1025,6 +1025,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                             est.documento,
                             estudianteNombre,
                             f.estado,
+                            `${f.preguntasRespondidas}/${f.cantidadPreguntas}`,
                             nota,
                             formatLocalDateTimeHM(f.startedAt),
                             formatLocalDateTimeHM(f.submittedAt),
@@ -1073,11 +1074,12 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                 <colgroup>
                   <col style={{ width: '14%' }} />
-                  <col style={{ width: '26%' }} />
+                  <col style={{ width: '24%' }} />
                   <col style={{ width: '10%' }} />
+                  <col style={{ width: '12%' }} />
                   <col style={{ width: '10%' }} />
                   <col style={{ width: '16%' }} />
-                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '14%' }} />
                   <col style={{ width: '8%' }} />
                   <col style={{ width: '10%' }} />
                 </colgroup>
@@ -1086,6 +1088,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Documento</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estudiante</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Estado</th>
+                    <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Resp./Asig.</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Nota</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Inicio</th>
                     <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)' }}>Envío</th>
@@ -1098,6 +1101,7 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                     const est = f.estudiante
                     const estudianteNombre = `${est.nombres} ${est.apellidos}`
                     const nota = typeof f.resultado?.notaSobre5 === 'number' ? f.resultado.notaSobre5.toFixed(2) : ''
+                    const progresoPreguntas = `${f.preguntasRespondidas}/${f.cantidadPreguntas}`
 
                     const canDelete =
                       (rol === 'ADMIN') ||
@@ -1129,6 +1133,9 @@ export function ResultsView({ lockedDocenteId, rol }: Props) {
                         </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
                           {f.estado}
+                        </td>
+                        <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', whiteSpace: 'nowrap' }}>
+                          {progresoPreguntas}
                         </td>
                         <td style={{ padding: '6px 6px', borderBottom: '1px solid var(--wg-border)', fontWeight: 800, whiteSpace: 'nowrap' }}>
                           {nota}

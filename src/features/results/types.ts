@@ -23,6 +23,8 @@ export type ExamenResultadoFilaResponse = {
   reopenCount: number | null
   extraMinutesTotal: number | null
   submittedAt: string | null
+  cantidadPreguntas: number
+  preguntasRespondidas: number
   resultado: ResultadoIntentoResponse | null
 }
 
