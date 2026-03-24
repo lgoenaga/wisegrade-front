@@ -165,6 +165,11 @@
   padding: 10px;
 }
 
+.appLoadingCard {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
 /* Slightly tighter padding for the Users page cards */
 .usersCard {
   padding: 8px 10px;

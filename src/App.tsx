@@ -273,7 +273,7 @@ function App() {
           </div>
         </header>
         <main className="appMain">
-          <div className="card" style={{ maxWidth: 420, margin: '0 auto' }}>
+          <div className="card appLoadingCard">
             Cargando…
           </div>
         </main>
@@ -305,16 +305,29 @@ function App() {
 
             {me && me.rol === 'ADMIN' ? (
               <div className="headerMenu" onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  className="btnSecondary headerBtn"
-                  aria-label="Menú"
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen((v) => !v)}
-                >
-                  ☰
-                </button>
+                {menuOpen ? (
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    aria-label="Menú"
+                    aria-haspopup="menu"
+                    aria-expanded="true"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    ☰
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btnSecondary headerBtn"
+                    aria-label="Menú"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    onClick={() => setMenuOpen(true)}
+                  >
+                    ☰
+                  </button>
+                )}
 
                 {menuOpen ? (
                   <div className="headerMenuDropdown" role="menu">
