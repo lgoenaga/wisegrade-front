@@ -17,6 +17,12 @@ import type {
   RespuestaCorrecta,
 } from './types'
 
+const EXAM_NOTRANSLATE_CLASS = 'notranslate'
+
+function isRespuestaCorrecta(value: string): value is RespuestaCorrecta {
+  return value === 'A' || value === 'B' || value === 'C' || value === 'D'
+}
+
 type Props = {
   intento: IntentoSnapshot
   onSubmitted: (attemptId: number) => void
@@ -179,6 +185,43 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       setPendingSubmit(false)
     }
   }, [intento.estado])
+
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const previousHtmlTranslate = html.getAttribute('translate')
+    const previousBodyTranslate = body.getAttribute('translate')
+    const previousHtmlLang = html.getAttribute('lang')
+
+    html.setAttribute('translate', 'no')
+    body.setAttribute('translate', 'no')
+    html.setAttribute('lang', 'es')
+    html.classList.add(EXAM_NOTRANSLATE_CLASS)
+    body.classList.add(EXAM_NOTRANSLATE_CLASS)
+
+    return () => {
+      if (previousHtmlTranslate == null) {
+        html.removeAttribute('translate')
+      } else {
+        html.setAttribute('translate', previousHtmlTranslate)
+      }
+
+      if (previousBodyTranslate == null) {
+        body.removeAttribute('translate')
+      } else {
+        body.setAttribute('translate', previousBodyTranslate)
+      }
+
+      if (previousHtmlLang == null) {
+        html.removeAttribute('lang')
+      } else {
+        html.setAttribute('lang', previousHtmlLang)
+      }
+
+      html.classList.remove(EXAM_NOTRANSLATE_CLASS)
+      body.classList.remove(EXAM_NOTRANSLATE_CLASS)
+    }
+  }, [])
 
   const isSubmitted = submitOk || intento.estado === 'SUBMITTED'
   const isServerBlocked = intento.estado === 'BLOCKED'
@@ -542,6 +585,11 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     setAnswersByPreguntaId((prev) => ({ ...prev, [String(preguntaId)]: respuesta }))
   }
 
+  function handleOptionChange(preguntaId: number, value: string) {
+    if (!isRespuestaCorrecta(value)) return
+    setAnswer(preguntaId, value)
+  }
+
   const canSubmit =
     !submitOk &&
     !submitting &&
@@ -569,7 +617,11 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   }
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
+    <div
+      className="notranslate"
+      translate="no"
+      style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>
           Examen{materiaNombre ? `: ${materiaNombre}` : ''}
@@ -635,6 +687,12 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       ) : null}
 
+      {!submitOk ? (
+        <p className="muted notranslate" translate="no" style={{ marginTop: 6, fontSize: 13 }}>
+          Para evitar errores durante el examen, desactiva la traduccion automatica del navegador.
+        </p>
+      ) : null}
+
       {error ? (
         <p style={{ marginTop: 6, fontSize: 13 }}>
           <strong>Error:</strong> {error}
@@ -689,29 +747,43 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
 
         {currentPregunta ? (
-          <div className="card">
+          <div className="card notranslate" translate="no">
             <div style={{ marginBottom: 10 }}>
-              <strong>{currentIdx + 1}.</strong> {currentPregunta.enunciado}
+              <span className="notranslate" translate="no">
+                <strong>{currentIdx + 1}.</strong>{' '}
+              </span>
+              <span>{currentPregunta.enunciado}</span>
               {isSubmitted && corr ? (
-                <span style={{ marginLeft: 12, opacity: 0.85 }}>
+                <span className="notranslate" translate="no" style={{ marginLeft: 12, opacity: 0.85 }}>
                   · <strong>{corr.esCorrecta ? 'Correcta' : 'Incorrecta'}</strong>
                 </span>
               ) : null}
             </div>
 
-            <div style={{ display: 'grid', gap: 8 }}>
+            <div className="notranslate" translate="no" style={{ display: 'grid', gap: 8 }}>
               {optionsFor(currentPregunta).map((o) => (
-                <label key={o.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <label
+                  key={o.key}
+                  className="notranslate"
+                  translate="no"
+                  style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}
+                >
                   <input
                     type="radio"
                     name={`p-${currentPregunta.id}`}
+                    value={o.key}
+                    data-pregunta-id={currentPregunta.id}
+                    data-option-key={o.key}
                     checked={selected === o.key}
-                    onChange={() => setAnswer(currentPregunta.id, o.key)}
+                    onChange={(event) => handleOptionChange(currentPregunta.id, event.currentTarget.value)}
                     disabled={submitOk || isTimeUp || isBlocked}
                     style={{ marginTop: 4 }}
                   />
                   <span>
-                    <strong>{o.key}.</strong> {o.text}
+                    <span className="notranslate" translate="no">
+                      <strong>{o.key}.</strong>{' '}
+                    </span>
+                    <span>{o.text}</span>
                   </span>
                 </label>
               ))}
