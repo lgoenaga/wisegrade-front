@@ -1,0 +1,111 @@
+.examAttemptContainer {
+  max-width: 820px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.examAttemptCardPadded {
+  padding: 12px;
+}
+
+.examAttemptHeading {
+  margin: 0;
+  font-size: 18px;
+}
+
+.examAttemptBlockedMessage {
+  margin-top: 8px;
+  margin-bottom: 0;
+  font-size: 14px;
+}
+
+.examAttemptHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.examAttemptTimer {
+  text-align: right;
+}
+
+.examAttemptMetaTop {
+  margin-top: 2px;
+}
+
+.examAttemptMeta,
+.examAttemptMetaTop,
+.examAttemptPending {
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.examAttemptMeta {
+  margin-top: 4px;
+}
+
+.examAttemptInfo {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.examAttemptDim {
+  opacity: 0.8;
+}
+
+.examAttemptActions {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.examAttemptQuestionSection {
+  margin-top: 10px;
+}
+
+.examAttemptQuestionNav {
+  justify-content: space-between;
+}
+
+.examAttemptQuestionCounter {
+  font-size: 14px;
+}
+
+.examAttemptQuestionStem {
+  margin-bottom: 10px;
+}
+
+.examAttemptQuestionStatus {
+  margin-left: 12px;
+  opacity: 0.85;
+}
+
+.examAttemptOptions {
+  display: grid;
+  gap: 8px;
+}
+
+.examAttemptOption {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.examAttemptOptionInput {
+  margin-top: 4px;
+}
+
+.examAttemptCorrection {
+  margin-top: 12px;
+  opacity: 0.95;
+}
+
+.examAttemptExplanation {
+  margin-top: 8px;
+}
+
+.examAttemptPending {
+  margin-top: 6px;
+}

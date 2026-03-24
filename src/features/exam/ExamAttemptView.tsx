@@ -1,3 +1,4 @@
+import './ExamAttemptView.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiGetBlob, apiGetJson, apiPostJson } from '../../lib/api'
 import { EXAM_DURATION_MINUTES, assertFinitePositive } from '../../lib/config'
@@ -16,6 +17,12 @@ import type {
   RespuestaGuardadaResponse,
   RespuestaCorrecta,
 } from './types'
+
+const EXAM_NOTRANSLATE_CLASS = 'notranslate'
+
+function isRespuestaCorrecta(value: string): value is RespuestaCorrecta {
+  return value === 'A' || value === 'B' || value === 'C' || value === 'D'
+}
 
 type Props = {
   intento: IntentoSnapshot
@@ -179,6 +186,43 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       setPendingSubmit(false)
     }
   }, [intento.estado])
+
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const previousHtmlTranslate = html.getAttribute('translate')
+    const previousBodyTranslate = body.getAttribute('translate')
+    const previousHtmlLang = html.getAttribute('lang')
+
+    html.setAttribute('translate', 'no')
+    body.setAttribute('translate', 'no')
+    html.setAttribute('lang', 'es')
+    html.classList.add(EXAM_NOTRANSLATE_CLASS)
+    body.classList.add(EXAM_NOTRANSLATE_CLASS)
+
+    return () => {
+      if (previousHtmlTranslate == null) {
+        html.removeAttribute('translate')
+      } else {
+        html.setAttribute('translate', previousHtmlTranslate)
+      }
+
+      if (previousBodyTranslate == null) {
+        body.removeAttribute('translate')
+      } else {
+        body.setAttribute('translate', previousBodyTranslate)
+      }
+
+      if (previousHtmlLang == null) {
+        html.removeAttribute('lang')
+      } else {
+        html.setAttribute('lang', previousHtmlLang)
+      }
+
+      html.classList.remove(EXAM_NOTRANSLATE_CLASS)
+      body.classList.remove(EXAM_NOTRANSLATE_CLASS)
+    }
+  }, [])
 
   const isSubmitted = submitOk || intento.estado === 'SUBMITTED'
   const isServerBlocked = intento.estado === 'BLOCKED'
@@ -542,6 +586,11 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
     setAnswersByPreguntaId((prev) => ({ ...prev, [String(preguntaId)]: respuesta }))
   }
 
+  function handleOptionChange(preguntaId: number, value: string) {
+    if (!isRespuestaCorrecta(value)) return
+    setAnswer(preguntaId, value)
+  }
+
   const canSubmit =
     !submitOk &&
     !submitting &&
@@ -557,10 +606,10 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
 
   if (isBlocked && !isSubmitted) {
     return (
-      <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
-        <div className="card" style={{ padding: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Examen bloqueado</h2>
-          <p style={{ marginTop: 8, marginBottom: 0, fontSize: 14 }}>
+      <div className="examAttemptContainer">
+        <div className="card examAttemptCardPadded">
+          <h2 className="examAttemptHeading">Examen bloqueado</h2>
+          <p className="examAttemptBlockedMessage">
             Este intento fue bloqueado por antitrampa. Contacta al docente para que lo reabra o lo envíe.
           </p>
         </div>
@@ -569,12 +618,12 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
   }
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>
+    <div className="examAttemptContainer notranslate" translate="no">
+      <div className="examAttemptHeaderRow">
+        <h2 className="examAttemptHeading">
           Examen{materiaNombre ? `: ${materiaNombre}` : ''}
         </h2>
-        <div style={{ textAlign: 'right' }}>
+        <div className="examAttemptTimer">
           <div>
             Tiempo restante: <strong>{mm}:{ss}</strong>
           </div>
@@ -586,16 +635,16 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       </div>
 
-      <div style={{ marginTop: 2, opacity: 0.8, fontSize: 13 }}>
+      <div className="examAttemptMetaTop">
         ID Examen: <strong>{intento.examenId}</strong>
       </div>
 
-      <div style={{ marginTop: 4, opacity: 0.8, fontSize: 13 }}>
+      <div className="examAttemptMeta">
         Estado: <strong>{submitOk ? 'ENVIADO' : pendingSubmit ? 'PENDIENTE DE ENVÍO' : 'EN PROGRESO'}</strong>
       </div>
 
       {isSubmitted ? (
-        <div style={{ marginTop: 6, fontSize: 13 }}>
+        <div className="examAttemptInfo">
           <strong>Resultado:</strong>{' '}
           {submittedDetail?.resultado ? (
             <span>
@@ -603,13 +652,13 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
               {submittedDetail.resultado.notaSobre5.toFixed(2)}/5.00
             </span>
           ) : (
-            <span style={{ opacity: 0.8 }}>Calificación no disponible (aún).</span>
+            <span className="examAttemptDim">Calificación no disponible (aún).</span>
           )}
         </div>
       ) : null}
 
       {isSubmitted ? (
-        <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className="examAttemptActions">
           <button type="button" className="btnSecondary examBtn" onClick={() => void handleExportPdf()} disabled={exportingPdf}>
             {exportingPdf ? 'Exportando PDF…' : 'Exportar PDF'}
           </button>
@@ -617,14 +666,14 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       ) : null}
 
       {!submitOk ? (
-        <div style={{ marginTop: 4, opacity: 0.8, fontSize: 13 }}>
+        <div className="examAttemptMeta">
           Antitrampa: <strong>{isBlocked ? 'BLOQUEADO' : `${antiCheatWarnings}/3`}</strong>
           {antiCheatWarnings > 0 && !isBlocked ? <span> · Al llegar a 3 se bloquea</span> : null}
         </div>
       ) : null}
 
       {!submitOk ? (
-        <div style={{ marginTop: 4, opacity: 0.8, fontSize: 13 }}>
+        <div className="examAttemptMeta">
           Respondidas: <strong>{answeredCount}</strong> / {intento.preguntas.length}
           {missingCount > 0 ? (
             <span>
@@ -635,20 +684,26 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       ) : null}
 
+      {!submitOk ? (
+        <p className="examAttemptInfo muted notranslate" translate="no">
+          Para evitar errores durante el examen, desactiva la traduccion automatica del navegador.
+        </p>
+      ) : null}
+
       {error ? (
-        <p style={{ marginTop: 6, fontSize: 13 }}>
+        <p className="examAttemptInfo">
           <strong>Error:</strong> {error}
         </p>
       ) : null}
 
       {antiCheatNote ? (
-        <p style={{ marginTop: 6, fontSize: 13 }}>
+        <p className="examAttemptInfo">
           <strong>Antitrampa:</strong> {antiCheatNote}
         </p>
       ) : null}
 
       {!submitOk && !isBlocked ? (
-        <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className="examAttemptActions">
           <button
             className="examBtn"
             onClick={async () => {
@@ -665,9 +720,9 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
       ) : null}
 
-      <div style={{ marginTop: 10 }} className="stack">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 14 }} className="muted">
+      <div className="stack examAttemptQuestionSection">
+        <div className="row examAttemptQuestionNav">
+          <div className="muted examAttemptQuestionCounter">
             Pregunta <strong>{totalPreguntas ? currentIdx + 1 : 0}</strong> / {totalPreguntas}
           </div>
           <div className="row">
@@ -689,36 +744,49 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
         </div>
 
         {currentPregunta ? (
-          <div className="card">
-            <div style={{ marginBottom: 10 }}>
-              <strong>{currentIdx + 1}.</strong> {currentPregunta.enunciado}
+          <div className="card notranslate" translate="no">
+            <div className="examAttemptQuestionStem">
+              <span className="notranslate" translate="no">
+                <strong>{currentIdx + 1}.</strong>{' '}
+              </span>
+              <span>{currentPregunta.enunciado}</span>
               {isSubmitted && corr ? (
-                <span style={{ marginLeft: 12, opacity: 0.85 }}>
+                <span className="notranslate examAttemptQuestionStatus" translate="no">
                   · <strong>{corr.esCorrecta ? 'Correcta' : 'Incorrecta'}</strong>
                 </span>
               ) : null}
             </div>
 
-            <div style={{ display: 'grid', gap: 8 }}>
+            <div className="notranslate examAttemptOptions" translate="no">
               {optionsFor(currentPregunta).map((o) => (
-                <label key={o.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <label
+                  key={o.key}
+                  className="notranslate examAttemptOption"
+                  translate="no"
+                >
                   <input
                     type="radio"
                     name={`p-${currentPregunta.id}`}
+                    value={o.key}
+                    data-pregunta-id={currentPregunta.id}
+                    data-option-key={o.key}
                     checked={selected === o.key}
-                    onChange={() => setAnswer(currentPregunta.id, o.key)}
+                    onChange={(event) => handleOptionChange(currentPregunta.id, event.currentTarget.value)}
                     disabled={submitOk || isTimeUp || isBlocked}
-                    style={{ marginTop: 4 }}
+                    className="examAttemptOptionInput"
                   />
                   <span>
-                    <strong>{o.key}.</strong> {o.text}
+                    <span className="notranslate" translate="no">
+                      <strong>{o.key}.</strong>{' '}
+                    </span>
+                    <span>{o.text}</span>
                   </span>
                 </label>
               ))}
             </div>
 
             {isSubmitted && corr ? (
-              <div style={{ marginTop: 12, opacity: 0.95 }}>
+              <div className="examAttemptCorrection">
                 <div>
                   <strong>Tu respuesta:</strong> {corr.respuestaEstudiante ?? 'Sin responder'}
                 </div>
@@ -726,7 +794,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
                   <strong>Correcta:</strong> {corr.respuestaCorrecta}
                 </div>
                 {corr.explicacion ? (
-                  <div style={{ marginTop: 8 }}>
+                  <div className="examAttemptExplanation">
                     <strong>Explicación:</strong> {corr.explicacion}
                   </div>
                 ) : null}
@@ -745,7 +813,7 @@ export function ExamAttemptView({ intento, onSubmitted }: Props) {
       </div>
 
       {pendingSubmit && !submitOk ? (
-        <p style={{ marginTop: 6, opacity: 0.8, fontSize: 13 }}>Reintentando envío automáticamente…</p>
+        <p className="examAttemptPending">Reintentando envío automáticamente…</p>
       ) : null}
     </div>
   )
