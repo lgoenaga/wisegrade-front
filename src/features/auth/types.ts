@@ -15,6 +15,6 @@ export type AuthMeResponse = {
 }
 
 export type AuthLoginRequest = {
-  email: string
-  password: string
+  documento: string
+  clave: string
 }

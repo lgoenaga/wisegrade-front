@@ -31,7 +31,7 @@ export function LoginView({ onLoggedIn }: Props) {
     setError(null)
 
     try {
-      const payload: AuthLoginRequest = { email: documento.trim(), password: clave }
+      const payload: AuthLoginRequest = { documento: documento.trim(), clave }
       const me = await apiPostJson<AuthMeResponse>('/auth/login', payload)
       onLoggedIn(me)
     } catch (e: unknown) {
